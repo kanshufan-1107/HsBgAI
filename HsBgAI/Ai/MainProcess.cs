@@ -11,12 +11,6 @@ namespace HsBgAI.Ai
 {
     public class MainProcess
     {
-
-        public bool Running = false;
-        public GameInfo gameInfo;
-
-        private static MainProcess _instance;
-
         public static MainProcess Instance
         {
             get
@@ -25,12 +19,20 @@ namespace HsBgAI.Ai
                 return _instance;
             }
         }
+        public bool Running = false;
+        public GameInfo gameInfo;
 
+
+        private static MainProcess _instance;
         private GameBattleState _state;
         private GameBattleState _preState;
         private GameBattleState _nextState;
         private int _curStateTimes = 0;
         private bool _hasOpitonToDo = true;
+        private static readonly string JsonFilePath = Path.Combine(HsBgAI.pluginMainPath, $"Monitor{HsBgAI.monitorSuffix}.json");
+        private readonly object _saveLock = new object();
+        private DateTime _lastSaveTime = DateTime.MinValue;
+        private bool _isDirty = false;
 
         private MainProcess()
         {
@@ -39,18 +41,95 @@ namespace HsBgAI.Ai
             _preState = GameBattleState.INVALID;
 
             gameInfo = new GameInfo();
-            if (!Directory.Exists(HsBgAI.pluginMainPath)) Directory.CreateDirectory(HsBgAI.pluginMainPath);
-            var jsonFilePath = Path.Combine(HsBgAI.pluginMainPath, $"Monitor{HsBgAI.monitorSuffix}.json");
-            if (File.Exists(jsonFilePath))
+            LoadGameInfo();
+        }
+
+        /// <summary>
+        /// 加载游戏信息
+        /// </summary>
+        private void LoadGameInfo()
+        {
+            try
             {
-                var json = File.ReadAllText(jsonFilePath);
-                var gameInfoObj = JsonConvert.DeserializeObject<GameInfo>(json);
-                if (gameInfoObj != null)
+                if (!Directory.Exists(HsBgAI.pluginMainPath))
+                    Directory.CreateDirectory(HsBgAI.pluginMainPath);
+
+                if (File.Exists(JsonFilePath))
                 {
-                    gameInfo.AllRunTime = gameInfoObj.AllRunTime;
-                    gameInfo.AllGetXp = gameInfoObj.AllGetXp;
+                    var json = File.ReadAllText(JsonFilePath);
+                    var gameInfoObj = JsonConvert.DeserializeObject<GameInfo>(json);
+                    if (gameInfoObj != null)
+                    {
+                        gameInfo.AllRunTime = gameInfoObj.AllRunTime;
+                        gameInfo.AllGetXp = gameInfoObj.AllGetXp;
+                    }
+                    LogPrintUtils.Info(Utils.GetCallingMethod(), "游戏信息加载成功");
                 }
             }
+            catch (Exception ex)
+            {
+                LogPrintUtils.Exception(Utils.GetCallingMethod(), ex);
+            }
+        }
+
+        /// <summary>
+        /// 异步保存游戏信息
+        /// </summary>
+        /// <param name="forceSave"></param>
+        /// <returns></returns>
+        public async UniTask SaveGameInfoAsync(bool forceSave = false)
+        {
+            if (!forceSave && !_isDirty) return;
+
+            var now = DateTime.Now;
+            if (!forceSave && (now - _lastSaveTime).TotalSeconds < 5) return; // 5秒内只保存一次
+
+            await UniTask.RunOnThreadPool(() =>
+            {
+                lock (_saveLock)
+                {
+                    try
+                    {
+                        var tempFilePath = JsonFilePath + ".tmp";
+                        string json = JsonConvert.SerializeObject(gameInfo, Formatting.Indented);
+                        File.WriteAllText(tempFilePath, json);
+
+                        // 原子性替换文件
+                        if (File.Exists(JsonFilePath))
+                            File.Delete(JsonFilePath);
+                        File.Move(tempFilePath, JsonFilePath);
+
+                        _lastSaveTime = now;
+                        _isDirty = false;
+
+                        LogPrintUtils.Info(Utils.GetCallingMethod(), "游戏信息已保存");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogPrintUtils.Exception(Utils.GetCallingMethod(), ex);
+                    }
+                }
+            });
+        }
+        
+        /// <summary>
+        /// 标记数据为脏数据，需要保存
+        /// </summary>
+        public void MarkDirty()
+        {
+            _isDirty = true;
+            // 延迟保存，避免频繁IO
+            _ = DelaySave();
+        }
+
+        /// <summary>
+        /// 延迟保存
+        /// </summary>
+        /// <returns></returns>
+        private async UniTask DelaySave()
+        {
+            await UniTask.Delay(2000); // 延迟2秒保存
+            await SaveGameInfoAsync();
         }
 
         /// <summary>
@@ -70,6 +149,8 @@ namespace HsBgAI.Ai
                 _state = GameBattleState.INVALID;
                 _nextState = GameBattleState.INVALID;
                 _preState = GameBattleState.INVALID;
+                // 程序停止时强制保存
+                await SaveGameInfoAsync(true);
             }
             return;
         }
@@ -174,6 +255,8 @@ namespace HsBgAI.Ai
             {
                 HsBgAI.findingGameFirstSave = true;
                 gameInfo = GetGameInfo();
+                // 标记需要保存
+                MarkDirty();
             }
             var gameMgr = GameMgr.Get();
             if (GameInfoUtils.IsPlaying)
@@ -337,7 +420,7 @@ namespace HsBgAI.Ai
             }
 
             // 摆烂逻辑处理
-                if (lazzyAfterTop4.Value && TryLazzyAfterTop4()) return;
+            if (lazzyAfterTop4.Value && TryLazzyAfterTop4()) return;
 
             // 操作可行性检查
             if (!ShouldExecuteActions()) return;
@@ -495,6 +578,8 @@ namespace HsBgAI.Ai
             LogPrintUtils.Info(Utils.GetCallingMethod(), "进入战斗回合");
             gameInfo.AllRunTime += (long)HsBgAI.stopwatch.Elapsed.TotalSeconds;
             gameInfo = GetGameInfo();
+            // 标记需要保存
+            MarkDirty();
             HsBgAI.stopwatch.Restart();
             var (isCanceled, _) = await AsyncUtil.WaitForAsync(async UniTask<bool> () =>
             {
@@ -541,6 +626,8 @@ namespace HsBgAI.Ai
                     HsBgAI.matchFirstRecord = false;
                     gameInfo.AllRunTime += (long)HsBgAI.stopwatch.Elapsed.TotalSeconds;
                     gameInfo = GetGameInfo();
+                    // 标记需要保存
+                    MarkDirty();
                     HsBgAI.stopwatch.Restart();
                 }
                 await UniTask.Delay(3000);
@@ -630,7 +717,11 @@ namespace HsBgAI.Ai
                 TimeSpan ts1 = DateTime.Now - Convert.ToDateTime("2025-11-05");
                 TimeSpan ts2 = Convert.ToDateTime("2026-03-11") - DateTime.Now;
                 newObj.PassportEnd = $"2025.11.05~2026.03.11 已过{ts1.Days}天{ts1.Hours}小时{ts1.Minutes}分 还剩{ts2.Days}天";
-                Utils.SaveJsonData(newObj);
+                GameSaveDataManager.Get().GetSubkeyValue(GameSaveKeyId.BACON, GameSaveKeySubkeyId.BACON_HEROES_PICKED_COUNT, out List<long> HeroesPickedCount);
+                GameSaveDataManager.Get().GetSubkeyValue(GameSaveKeyId.BACON, GameSaveKeySubkeyId.BACON_TOP_4_FINISHES, out long Top4Finishes);
+                int top4Finishes = (int)Top4Finishes - 1;
+                int rating = BaconLobbyMgr.Get()?.GetBattlegroundsActiveGameModeRating() ?? 0;
+                newObj.BattlegroundsInfo = $"{rating} {HeroesPickedCount.Sum()}场 前四: {top4Finishes}";
             }
             return newObj;
         }

@@ -42,10 +42,10 @@ namespace HsBgAI
         /// </summary>
         private void Awake()
         {
-            if (ArguUtils.Instance.Exists("hsunitid")) 
+            if (ArguUtils.Instance.Exists("hsunitid"))
                 hsUnitID = ArguUtils.Instance.Single("hsunitid");
-                monitorSuffix = string.IsNullOrEmpty(hsUnitID) ? "" : $"-{hsUnitID}";
-            if (hsUnitID.Length <= 0) 
+            monitorSuffix = string.IsNullOrEmpty(hsUnitID) ? "" : $"-{hsUnitID}";
+            if (hsUnitID.Length <= 0)
                 ConfigBind(Config);
             else
             {

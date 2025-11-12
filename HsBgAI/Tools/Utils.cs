@@ -47,25 +47,6 @@ namespace HsBgAI.Tools
         }
 
         /// <summary>
-        /// 保存监控信息
-        /// </summary>
-        /// <param name="newObj"></param>
-        public static void SaveJsonData(GameInfo newObj)
-        {
-            GameSaveDataManager.Get().GetSubkeyValue(GameSaveKeyId.BACON, GameSaveKeySubkeyId.BACON_HEROES_PICKED_COUNT, out List<long> HeroesPickedCount);
-            GameSaveDataManager.Get().GetSubkeyValue(GameSaveKeyId.BACON, GameSaveKeySubkeyId.BACON_TOP_4_FINISHES, out long Top4Finishes);
-            int top4Finishes = (int)Top4Finishes - 1;
-            int rating = BaconLobbyMgr.Get()?.GetBattlegroundsActiveGameModeRating() ?? 0;
-            newObj.BattlegroundsInfo = $"{rating} {HeroesPickedCount.Sum()}场 前四: {top4Finishes}";
-            if (!Directory.Exists(HsBgAI.pluginMainPath)) Directory.CreateDirectory(HsBgAI.pluginMainPath);
-            var jsonFile = Path.Combine(HsBgAI.pluginMainPath, $"Monitor{HsBgAI.monitorSuffix}.json");
-            if (File.Exists(jsonFile)) File.Delete(jsonFile);
-            LogPrintUtils.Info(GetCallingMethod(), $"保存信息到Monitor{HsBgAI.monitorSuffix}.json");
-            string json = JsonConvert.SerializeObject(newObj, Formatting.Indented);
-            File.WriteAllText(jsonFile, json);
-        }
-
-        /// <summary>
         /// 保存错误监控信息
         /// </summary>
         public static void SaveErrorJsonData()
