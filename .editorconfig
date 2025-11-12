@@ -1,0 +1,40 @@
+[*.cs]
+
+# IDE0090: 使用 "new(...)"
+dotnet_diagnostic.IDE0090.severity = silent
+
+# IDE0028: 简化集合初始化
+dotnet_diagnostic.IDE0028.severity = silent
+
+# IDE0017: 简化对象初始化
+dotnet_diagnostic.IDE0017.severity = silent
+
+# IDE0044: 添加只读修饰符
+dotnet_diagnostic.IDE0044.severity = silent
+
+# CS8618: 在退出构造函数时，不可为 null 的字段必须包含非 null 值。请考虑添加 "required" 修饰符或声明为可为 null。
+dotnet_diagnostic.CS8618.severity = silent
+
+# CS8603: 可能返回 null 引用。
+dotnet_diagnostic.CS8603.severity = silent
+
+# CS8625: 无法将 null 字面量转换为非 null 的引用类型。
+dotnet_diagnostic.CS8625.severity = silent
+
+# IDE0320: 使匿名函数成为静态函数
+dotnet_diagnostic.IDE0320.severity = silent
+
+# CS8602: 解引用可能出现空引用。
+dotnet_diagnostic.CS8602.severity = silent
+
+# CS8604: 引用类型参数可能为 null。
+dotnet_diagnostic.CS8604.severity = silent
+
+# CS8600: 将 null 字面量或可能为 null 的值转换为非 null 类型。
+dotnet_diagnostic.CS8600.severity = silent
+
+# Default severity for analyzer diagnostics with category 'Style'
+dotnet_analyzer_diagnostic.category-Style.severity = silent
+
+# CS8619: 值中的引用类型的为 Null 性与目标类型不匹配。
+dotnet_diagnostic.CS8619.severity = silent
