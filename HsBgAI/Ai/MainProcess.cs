@@ -201,6 +201,7 @@ namespace HsBgAI.Ai
                             HsBgAI.findingGameFirstSave = false;
                             HsBgAI.lazzyGameCount = 0;
                             HsBgAI.gameUUID = Utils.GenerateJavaCompatibleUuid();
+                            HsBgAI.ResetGameState();
                             await ChooseHero();
                             break;
                         case GameBattleState.WAITING_FOR_OWN_TURN:

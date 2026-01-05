@@ -44,11 +44,16 @@ namespace HsBgAI.Patchers
                     }
                     index++;
                 }
-                if (HsBgAI.xpChangedFirstSave)
+
+                // 记录通行证经验信息
+                if (!string.IsNullOrEmpty(MatchInfo))
                 {
-                    HsBgAI.xpChangedFirstSave = false;
-                    LogPrintUtils.WriteMatchLog($"MatchInfo={HsBgAI.gameUUID}|{MatchInfo}");
+                    HsBgAI.xpMatchInfo = MatchInfo;
+                    HsBgAI.hasXpInfo = true;
                 }
+
+                // 检查是否可以写入日志
+                CheckAndWriteLog();
             }
         }
 
@@ -83,17 +88,52 @@ namespace HsBgAI.Patchers
                         }
                         string gameType = GameMgr.Get().GetGameType().ToString();
                         string finalResult = BaconLobbyMgr.Get()?.GetBattlegroundsActiveGameModeRating().ToString();
-                        if (HsBgAI.endGameScreenFirstSave)
-                        {
-                            HsBgAI.endGameScreenFirstSave = false;
-                            LogPrintUtils.WriteMatchLog($"EndGameScreen={HsBgAI.gameUUID}|{DateTime.Now:yyyy-MM-dd HH:mm:ss},{gameRank},{finalResult},{gameType}");
-                        }
+
+                        // 记录游戏结束信息
+                        HsBgAI.gameEndInfo = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss},{gameRank},{finalResult},{gameType}";
+                        HsBgAI.hasGameEndInfo = true;
+
+                        // 检查是否可以写入日志
+                        CheckAndWriteLog();
                     }
                 }
             }
             catch (Exception ex)
             {
                 LogPrintUtils.Exception("HsBgAI.Patchers.RewardXpPatcher.PatchShowEndGameScreen".PadRight(40), ex);
+            }
+        }
+
+        /// <summary>
+        /// 检查并写入日志
+        /// </summary>
+        private static void CheckAndWriteLog()
+        {
+            // 确保只写入一次
+            if (HsBgAI.logWritten)
+                return;
+
+            // 只有在有游戏结束信息时才写入日志
+            if (HsBgAI.hasGameEndInfo)
+            {
+                if (!string.IsNullOrEmpty(HsBgAI.xpMatchInfo))
+                {
+                    LogPrintUtils.WriteMatchLog($"MatchInfo={HsBgAI.gameUUID}|{HsBgAI.xpMatchInfo}");
+                    LogPrintUtils.WriteMatchLog($"EndGameScreen={HsBgAI.gameUUID}|{HsBgAI.gameEndInfo}");
+                }
+                else
+                {
+                    LogPrintUtils.WriteMatchLog($"EndGameScreen={HsBgAI.gameUUID}|{HsBgAI.gameEndInfo}");
+                }
+
+                // 标记日志已写入
+                HsBgAI.logWritten = true;
+
+                // 清理状态
+                HsBgAI.hasGameEndInfo = false;
+                HsBgAI.hasXpInfo = false;
+                HsBgAI.gameEndInfo = "";
+                HsBgAI.xpMatchInfo = "";
             }
         }
     }

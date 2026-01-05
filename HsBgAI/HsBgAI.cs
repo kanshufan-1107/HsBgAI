@@ -38,11 +38,17 @@ namespace HsBgAI
         public static bool xpChangedFirstSave = false;
         public static bool endGameScreenFirstSave = false;
         public static bool temporarilyClosed = false;
-        public static string gameUUID = "";
         private static bool isRunning = true;
         private static bool showHelpMessage = false;
         private static float helpMessageStartTime = 0f;
         private static string helpMessageText = "";
+        public static string gameUUID = "";
+        // 状态管理字段
+        public static bool hasGameEndInfo = false;
+        public static bool hasXpInfo = false;
+        public static string gameEndInfo = "";
+        public static string xpMatchInfo = "";
+        public static bool logWritten = false;
 
         /// <summary>
         /// 插件加载
@@ -349,6 +355,18 @@ namespace HsBgAI
             result.SetPixels(pix);
             result.Apply();
             return result;
+        }
+
+        /// <summary>
+        /// 游戏开始时重置状态
+        /// </summary>
+        public static void ResetGameState()
+        {
+            hasGameEndInfo = false;
+            hasXpInfo = false;
+            gameEndInfo = "";
+            xpMatchInfo = "";
+            logWritten = false;
         }
     }
 }
