@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using BepInEx.Logging;
 using Hearthstone.Progression;
+using HsBgAI.Ai;
 using HsBgAI.Enums;
 using HsBgAI.Mapping;
 using Newtonsoft.Json;

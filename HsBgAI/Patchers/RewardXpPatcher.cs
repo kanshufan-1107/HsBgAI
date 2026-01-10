@@ -23,7 +23,6 @@ namespace HsBgAI.Patchers
                 var sortedXpChanges = xpChanges.OrderBy(x => x.CurrLevel)
                         .ThenBy(x => x.CurrXp)
                         .ToList();
-                string MatchInfo = "";
                 int index = 1;
                 foreach (var xpChange in sortedXpChanges)
                 {
@@ -33,10 +32,8 @@ namespace HsBgAI.Patchers
                     {
                         MainProcess.Instance.gameInfo.AllGetXp += introXpGained;
                         LogPrintUtils.Info(Utils.GetCallingMethod(), "通行证经验 + " + introXpGained + " 过去等级 " + xpChange.PrevLevel + " 过去经验 " + xpChange.PrevXp + " 当前等级 " + xpChange.CurrLevel + " 当前经验 " + xpChange.CurrXp);
-                        if (sortedXpChanges.Count == index)
-                        {
-                            MatchInfo += $"+{introXpGained},{xpChange.PrevLevel},{xpChange.PrevXp},{xpChange.CurrLevel},{xpChange.CurrXp}/{(xpChange.CurrLevel > 130 ? 1500 : GameInfoUtils.LevelExperienceThresholds[xpChange.CurrLevel - 1])}";
-                        }
+                        string MatchInfo = $"+{introXpGained},{xpChange.PrevLevel},{xpChange.PrevXp},{xpChange.CurrLevel},{xpChange.CurrXp}/{(xpChange.CurrLevel > 130 ? 1500 : GameInfoUtils.LevelExperienceThresholds[xpChange.CurrLevel - 1])}";
+                        LogPrintUtils.WriteMatchLog($"MatchInfo={HsBgAI.GameUid}|{MatchInfo}");
                     }
                     else if (rewardTrackType == RewardTrackType.BATTLEGROUNDS)
                     {
@@ -44,16 +41,6 @@ namespace HsBgAI.Patchers
                     }
                     index++;
                 }
-
-                // 记录通行证经验信息
-                if (!string.IsNullOrEmpty(MatchInfo))
-                {
-                    HsBgAI.xpMatchInfo = MatchInfo;
-                    HsBgAI.hasXpInfo = true;
-                }
-
-                // 检查是否可以写入日志
-                CheckAndWriteLog();
             }
         }
 
@@ -88,13 +75,7 @@ namespace HsBgAI.Patchers
                         }
                         string gameType = GameMgr.Get().GetGameType().ToString();
                         string finalResult = BaconLobbyMgr.Get()?.GetBattlegroundsActiveGameModeRating().ToString();
-
-                        // 记录游戏结束信息
-                        HsBgAI.gameEndInfo = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss},{gameRank},{finalResult},{gameType}";
-                        HsBgAI.hasGameEndInfo = true;
-
-                        // 检查是否可以写入日志
-                        CheckAndWriteLog();
+                        LogPrintUtils.WriteMatchLog($"EndGameScreen={HsBgAI.GameUid}|{DateTime.Now:yyyy-MM-dd HH:mm:ss},{gameRank},{finalResult},{gameType}");
                     }
                 }
             }
@@ -104,37 +85,5 @@ namespace HsBgAI.Patchers
             }
         }
 
-        /// <summary>
-        /// 检查并写入日志
-        /// </summary>
-        private static void CheckAndWriteLog()
-        {
-            // 确保只写入一次
-            if (HsBgAI.logWritten)
-                return;
-
-            // 只有在有游戏结束信息时才写入日志
-            if (HsBgAI.hasGameEndInfo)
-            {
-                if (!string.IsNullOrEmpty(HsBgAI.xpMatchInfo))
-                {
-                    LogPrintUtils.WriteMatchLog($"MatchInfo={HsBgAI.gameUUID}|{HsBgAI.xpMatchInfo}");
-                    LogPrintUtils.WriteMatchLog($"EndGameScreen={HsBgAI.gameUUID}|{HsBgAI.gameEndInfo}");
-                }
-                else
-                {
-                    LogPrintUtils.WriteMatchLog($"EndGameScreen={HsBgAI.gameUUID}|{HsBgAI.gameEndInfo}");
-                }
-
-                // 标记日志已写入
-                HsBgAI.logWritten = true;
-
-                // 清理状态
-                HsBgAI.hasGameEndInfo = false;
-                HsBgAI.hasXpInfo = false;
-                HsBgAI.gameEndInfo = "";
-                HsBgAI.xpMatchInfo = "";
-            }
-        }
     }
 }

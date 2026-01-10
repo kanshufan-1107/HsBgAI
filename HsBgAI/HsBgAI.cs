@@ -7,6 +7,7 @@ using Hearthstone.DataModels;
 using Hearthstone.Progression;
 using Hearthstone.UI;
 using HsBgAI.Ai;
+using HsBgAI.Mapping;
 using HsBgAI.Patchers;
 using HsBgAI.Tools;
 using PegasusShared;
@@ -42,13 +43,28 @@ namespace HsBgAI
         private static bool showHelpMessage = false;
         private static float helpMessageStartTime = 0f;
         private static string helpMessageText = "";
-        public static string gameUUID = "";
-        // 状态管理字段
-        public static bool hasGameEndInfo = false;
-        public static bool hasXpInfo = false;
-        public static string gameEndInfo = "";
-        public static string xpMatchInfo = "";
-        public static bool logWritten = false;
+
+        /// <summary>
+        /// 游戏信息
+        /// </summary>
+        public static Dictionary<string, string> gameInfo = new Dictionary<string, string>();
+
+        /// <summary>
+        /// 游戏唯一标识符
+        /// </summary>
+        public static string GameUid
+        {
+            get
+            {
+                if (!gameInfo.ContainsKey(hsUnitID))
+                {
+                    gameInfo[hsUnitID] = Utils.GenerateJavaCompatibleUuid();
+                }
+                return gameInfo[hsUnitID];
+            }
+
+            set => gameInfo[hsUnitID] = value;
+        }
 
         /// <summary>
         /// 插件加载
@@ -355,18 +371,6 @@ namespace HsBgAI
             result.SetPixels(pix);
             result.Apply();
             return result;
-        }
-
-        /// <summary>
-        /// 游戏开始时重置状态
-        /// </summary>
-        public static void ResetGameState()
-        {
-            hasGameEndInfo = false;
-            hasXpInfo = false;
-            gameEndInfo = "";
-            xpMatchInfo = "";
-            logWritten = false;
         }
     }
 }

@@ -111,7 +111,7 @@ namespace HsBgAI.Ai
                 }
             });
         }
-        
+
         /// <summary>
         /// 标记数据为脏数据，需要保存
         /// </summary>
@@ -200,8 +200,7 @@ namespace HsBgAI.Ai
                             HsBgAI.endGameScreenFirstSave = true;
                             HsBgAI.findingGameFirstSave = false;
                             HsBgAI.lazzyGameCount = 0;
-                            HsBgAI.gameUUID = Utils.GenerateJavaCompatibleUuid();
-                            HsBgAI.ResetGameState();
+                            HsBgAI.GameUid = Utils.GenerateJavaCompatibleUuid();
                             await ChooseHero();
                             break;
                         case GameBattleState.WAITING_FOR_OWN_TURN:
@@ -209,21 +208,21 @@ namespace HsBgAI.Ai
                             HsBgAI.endGameScreenFirstSave = true;
                             HsBgAI.findingGameFirstSave = false;
                             HsBgAI.lazzyGameCount = 0;
-                            if (string.IsNullOrEmpty(HsBgAI.gameUUID)) HsBgAI.gameUUID = Utils.GenerateJavaCompatibleUuid();
+                            if (string.IsNullOrEmpty(HsBgAI.GameUid)) HsBgAI.GameUid = Utils.GenerateJavaCompatibleUuid();
                             await WaittingForOwnTurn();
                             break;
                         case GameBattleState.OWN_TURN:
                             HsBgAI.xpChangedFirstSave = true;
                             HsBgAI.endGameScreenFirstSave = true;
                             HsBgAI.findingGameFirstSave = false;
-                            if (string.IsNullOrEmpty(HsBgAI.gameUUID)) HsBgAI.gameUUID = Utils.GenerateJavaCompatibleUuid();
+                            if (string.IsNullOrEmpty(HsBgAI.GameUid)) HsBgAI.GameUid = Utils.GenerateJavaCompatibleUuid();
                             await OwnTurn();
                             break;
                         case GameBattleState.BATTLE_TURN:
                             HsBgAI.xpChangedFirstSave = true;
                             HsBgAI.endGameScreenFirstSave = true;
                             HsBgAI.findingGameFirstSave = false;
-                            if (string.IsNullOrEmpty(HsBgAI.gameUUID)) HsBgAI.gameUUID = Utils.GenerateJavaCompatibleUuid();
+                            if (string.IsNullOrEmpty(HsBgAI.GameUid)) HsBgAI.GameUid = Utils.GenerateJavaCompatibleUuid();
                             await BattleTurn();
                             break;
                         case GameBattleState.GAME_OVER:
