@@ -33,7 +33,7 @@ namespace HsBgAI.Patchers
                         MainProcess.Instance.gameInfo.AllGetXp += introXpGained;
                         LogPrintUtils.Info(Utils.GetCallingMethod(), "通行证经验 + " + introXpGained + " 过去等级 " + xpChange.PrevLevel + " 过去经验 " + xpChange.PrevXp + " 当前等级 " + xpChange.CurrLevel + " 当前经验 " + xpChange.CurrXp);
                         string MatchInfo = $"+{introXpGained},{xpChange.PrevLevel},{xpChange.PrevXp},{xpChange.CurrLevel},{xpChange.CurrXp}/{(xpChange.CurrLevel > 130 ? 1500 : GameInfoUtils.LevelExperienceThresholds[xpChange.CurrLevel - 1])}";
-                        LogPrintUtils.WriteMatchLog($"MatchInfo={HsBgAI.GameUid}|{MatchInfo}");
+                        if (!HsBgAI.needConcede) LogPrintUtils.WriteMatchLog($"MatchInfo={HsBgAI.GameUid}|{MatchInfo}");
                     }
                     else if (rewardTrackType == RewardTrackType.BATTLEGROUNDS)
                     {
@@ -75,7 +75,8 @@ namespace HsBgAI.Patchers
                         }
                         string gameType = GameMgr.Get().GetGameType().ToString();
                         string finalResult = BaconLobbyMgr.Get()?.GetBattlegroundsActiveGameModeRating().ToString();
-                        LogPrintUtils.WriteMatchLog($"EndGameScreen={HsBgAI.GameUid}|{DateTime.Now:yyyy-MM-dd HH:mm:ss},{gameRank},{finalResult},{gameType}");
+                        string gameStr = $"EndGameScreen={HsBgAI.GameUid}|{DateTime.Now:yyyy-MM-dd HH:mm:ss},{gameRank},{finalResult},{gameType}";
+                        if (!HsBgAI.needConcede) LogPrintUtils.WriteMatchLog(gameStr);
                     }
                 }
             }
@@ -84,6 +85,5 @@ namespace HsBgAI.Patchers
                 LogPrintUtils.Exception("HsBgAI.Patchers.RewardXpPatcher.PatchShowEndGameScreen".PadRight(40), ex);
             }
         }
-
     }
 }
