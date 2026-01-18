@@ -251,6 +251,12 @@ namespace HsBgAI
                 }
                 UIStatus.Get().AddInfo(msg, 5f * Time.timeScale);
             }
+            else if (Input.GetKeyUp(KeyCode.F12))
+            {
+                LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), "批量分解多余的金卡...");
+                UIStatus.Get().AddInfo("批量分解多余的金卡...", 3f * Time.timeScale);
+                Utils.DisenchantExtraGoldenCards();
+            }
 
             // 检查是否超时
             if (showHelpMessage && Time.unscaledTime - helpMessageStartTime > 8f)
