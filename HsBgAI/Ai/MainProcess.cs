@@ -714,9 +714,9 @@ namespace HsBgAI.Ai
                 newObj.FullXpNeeded = newObj.AllXpNeeded - newObj.AllXp;
                 int hour = newObj.FullXpNeeded / (gameInfo.PerHourXp <= 10 ? 500 : gameInfo.PerHourXp);
                 newObj.FullTimeNeeded = hour == 0 ? "恭喜满级" : $"{hour / 24}天{hour % 24}小时";
-                TimeSpan ts1 = DateTime.Now - Convert.ToDateTime("2025-11-05");
-                TimeSpan ts2 = Convert.ToDateTime("2026-03-11") - DateTime.Now;
-                newObj.PassportEnd = $"2025.11.05~2026.03.11 已过{ts1.Days}天{ts1.Hours}小时{ts1.Minutes}分 还剩{ts2.Days}天";
+                TimeSpan ts1 = DateTime.Now - Convert.ToDateTime(PluginInfo.GAME_VERSION_START_TIME);
+                TimeSpan ts2 = Convert.ToDateTime(PluginInfo.GAME_VERSION_END_TIME) - DateTime.Now;
+                newObj.PassportEnd = $"{PluginInfo.CURRENT_VERSION_DURATION_STR} 已过{ts1.Days}天{ts1.Hours}小时{ts1.Minutes}分 还剩{ts2.Days}天";
                 GameSaveDataManager.Get().GetSubkeyValue(GameSaveKeyId.BACON, GameSaveKeySubkeyId.BACON_HEROES_PICKED_COUNT, out List<long> HeroesPickedCount);
                 GameSaveDataManager.Get().GetSubkeyValue(GameSaveKeyId.BACON, GameSaveKeySubkeyId.BACON_TOP_4_FINISHES, out long Top4Finishes);
                 int top4Finishes = (int)Top4Finishes - 1;
