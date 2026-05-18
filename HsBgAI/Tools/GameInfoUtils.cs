@@ -229,7 +229,7 @@ namespace HsBgAI.Tools
                     case TAG_RACE.ELEMENTAL:
                         racesCN.Add("元素");
                         break;
-                    case TAG_RACE.PET:
+                    case TAG_RACE.BEAST:
                         racesCN.Add("野兽");
                         break;
                     case TAG_RACE.PIRATE:

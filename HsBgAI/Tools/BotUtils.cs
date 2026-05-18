@@ -663,7 +663,7 @@ namespace HsBgAI.Tools
                             RewardListDbfRecord rewardListRecord = ProgressUtils.GetRewardListRecord(levelReward, paidType);
                             ProgressUtils.GetRewardListAssetId(levelReward, paidType);
                             //如果本级没有奖励 过
-                            if (null == rewardListRecord || rewardListRecord.RewardItems.Count <= 0)
+                            if (null == rewardListRecord || rewardListRecord.RewardItems.Count <= 0 || rewardListRecord.Locked)
                                 continue;
 
                             //如果领取过了 过

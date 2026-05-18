@@ -50,6 +50,10 @@
       <HintPath>LibHearthstone\blizzard.bgssdk.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Blizzard.Commerce.Bindings">
+      <HintPath>LibHearthstone\Blizzard.Commerce.Bindings.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Blizzard.Commerce.Model.CSharp">
       <HintPath>LibHearthstone\Blizzard.Commerce.Model.CSharp.dll</HintPath>
       <Private>False</Private>
@@ -106,6 +110,10 @@
       <HintPath>LibHearthstone\Blizzard.T5.JobQueue.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Blizzard.T5.Json">
+      <HintPath>LibHearthstone\Blizzard.T5.Json.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Blizzard.T5.Localization">
       <HintPath>LibHearthstone\Blizzard.T5.Localization.dll</HintPath>
       <Private>False</Private>
@@ -122,8 +130,16 @@
       <HintPath>LibHearthstone\Blizzard.T5.MiniJSON.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Blizzard.T5.NativeApis">
+      <HintPath>LibHearthstone\Blizzard.T5.NativeApis.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Blizzard.T5.Network-Core">
       <HintPath>LibHearthstone\Blizzard.T5.Network-Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Blizzard.T5.PerformanceMonitoring">
+      <HintPath>LibHearthstone\Blizzard.T5.PerformanceMonitoring.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Blizzard.T5.PlayMaker.Runtime">
@@ -138,12 +154,20 @@
       <HintPath>LibHearthstone\Blizzard.T5.ServiceLocator.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Blizzard.T5.Tact3.Runtime">
+      <HintPath>LibHearthstone\Blizzard.T5.Tact3.Runtime.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Blizzard.T5.UberText.Runtime">
       <HintPath>LibHearthstone\Blizzard.T5.UberText.Runtime.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Blizzard.T5.UI.Core">
       <HintPath>LibHearthstone\Blizzard.T5.UI.Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Blizzard.T5.VFXManager">
+      <HintPath>LibHearthstone\Blizzard.T5.VFXManager.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Blizzard.Telemetry.Identity">

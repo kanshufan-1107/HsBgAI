@@ -141,8 +141,8 @@ namespace HsBgAI
                                 "───────────────────────\n" +
                                 "F9 : 启动/停止战旗AI\n" +
                                 "F10 : 显示帮助信息\n" +
-                                "F11 : 领取成就和战令奖励\n" +
-                                "F12 : 批量分解多余的金卡\n" +
+                                (enableClaimReward.Value ? "F11 : 领取成就奖励\n" : "") +
+                                (enableClaimReward.Value ? "F12 : 领取战令奖励\n" : "") +
                                 "───────────────────────\n" +
                                 $"插件状态: {(enablePlugin.Value ? "运行中" : "已停止")}\n" +
                                 $"当前补丁数: {allPatchNum}\n" +
@@ -152,7 +152,7 @@ namespace HsBgAI
                 showHelpMessage = true;
                 helpMessageStartTime = Time.unscaledTime;
             }
-            else if (Input.GetKeyUp(KeyCode.F11))
+            else if (Input.GetKeyUp(KeyCode.F11) && enableClaimReward.Value)
             {
                 string msg = "";
                 LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), "领取成就奖励...");
@@ -189,7 +189,10 @@ namespace HsBgAI
                     LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), "没有可领取的成就奖励");
                 }
                 msg += "\n";
-
+                UIStatus.Get().AddInfo(msg, 5f * Time.timeScale);
+            } else if (Input.GetKeyUp(KeyCode.F12) && enableClaimReward.Value)
+            {
+                string msg = "";
                 LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), "领取战令奖励...");
                 int battlePassRewardCount = 0;
                 foreach (Global.RewardTrackType rewardTrackType in Enum.GetValues(typeof(Global.RewardTrackType)))
@@ -210,7 +213,7 @@ namespace HsBgAI
                                 RewardListDbfRecord rewardListRecord = ProgressUtils.GetRewardListRecord(levelReward, paidType);
                                 ProgressUtils.GetRewardListAssetId(levelReward, paidType);
                                 //如果本级没有奖励 过
-                                if (null == rewardListRecord || rewardListRecord.RewardItems.Count <= 0)
+                                if (null == rewardListRecord || rewardListRecord.RewardItems.Count <= 0 || rewardListRecord.Locked)
                                     continue;
 
                                 //如果领取过了 过
@@ -250,13 +253,6 @@ namespace HsBgAI
                     msg += "没有可领取的战令奖励";
                     LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), "没有可领取的战令奖励");
                 }
-                UIStatus.Get().AddInfo(msg, 5f * Time.timeScale);
-            }
-            else if (Input.GetKeyUp(KeyCode.F12))
-            {
-                LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), "批量分解多余的金卡...");
-                UIStatus.Get().AddInfo("批量分解多余的金卡...", 3f * Time.timeScale);
-                Utils.DisenchantExtraGoldenCards();
             }
 
             // 检查是否超时

@@ -645,10 +645,13 @@ namespace HsBgAI.Ai
             }
             // 刷新未完成的任务
             await BotUtils.RefreshUnfinishedQuest();
-            // 领取成就奖励
-            await BotUtils.ClaimAchievementReward();
-            // 领取战令奖励
-            await BotUtils.ClaimBattlePassReward();
+            if (enableClaimReward.Value)
+            {
+                // 领取成就奖励
+                await BotUtils.ClaimAchievementReward();
+                // 领取战令奖励
+                await BotUtils.ClaimBattlePassReward();
+            }
             LogPrintUtils.Info(Utils.GetCallingMethod(), "切换到无效状态");
             _nextState = GameBattleState.INVALID;
         }
