@@ -1,3 +1,4 @@
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Hearthstone.Progression;
 using HsBgAI.Enums;
@@ -33,6 +34,7 @@ namespace HsBgAI.Ai
         private readonly object _saveLock = new object();
         private DateTime _lastSaveTime = DateTime.MinValue;
         private bool _isDirty = false;
+        private CancellationTokenSource _delaySaveCts;
 
         private MainProcess()
         {
@@ -113,23 +115,31 @@ namespace HsBgAI.Ai
         }
 
         /// <summary>
-        /// 标记数据为脏数据，需要保存
+        /// 标记数据为脏数据，需要保存。
+        /// 重复调用会取消上一次延迟，重新计时，避免叠加多个 UniTask。
         /// </summary>
         public void MarkDirty()
         {
             _isDirty = true;
-            // 延迟保存，避免频繁IO
-            _ = DelaySave();
+            _delaySaveCts?.Cancel();
+            _delaySaveCts = new CancellationTokenSource();
+            _ = DelaySave(_delaySaveCts.Token);
         }
 
         /// <summary>
-        /// 延迟保存
+        /// 延迟保存（带取消令牌）
         /// </summary>
-        /// <returns></returns>
-        private async UniTask DelaySave()
+        private async UniTask DelaySave(CancellationToken ct)
         {
-            await UniTask.Delay(2000); // 延迟2秒保存
-            await SaveGameInfoAsync();
+            try
+            {
+                await UniTask.Delay(2000, cancellationToken: ct);
+                await SaveGameInfoAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                // 被新的 MarkDirty 调用取消，属正常流程，忽略
+            }
         }
 
         /// <summary>
@@ -665,16 +675,9 @@ namespace HsBgAI.Ai
             LogPrintUtils.Info(Utils.GetCallingMethod(), "游戏出现错误");
             HsBgAI.updateRequired = ReconnectMgr.Get().UpdateRequired;
             if (HsBgAI.updateRequired)
-            {
                 Utils.SaveErrorJsonData();
-                Thread.Sleep(11451);
-                Utils.Quit(114514);
-            }
-            else
-            {
-                Thread.Sleep(11451);
-                Utils.Quit(114514);
-            }
+            Thread.Sleep(11451);
+            Utils.Quit(114514);
         }
 
         /// <summary>

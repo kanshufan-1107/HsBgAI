@@ -390,7 +390,8 @@ namespace HsBgAI.Tools
                     return targets.Where(x => x.GetControllerSide() == Player.Side.FRIENDLY)
                         .OrderByDescending(x => x.GetEntity().GetTechLevel()).FirstOrDefault();
                 case "BG20_HERO_301p"://吞噬者穆坦努斯
-                    return targets.OrderByDescending(x => x.GetEntity().GetRealTimeAttack() + x.GetEntity().GetHealth()).OrderByDescending(x => x.GetEntity().GetTechLevel()).FirstOrDefault();
+                    // 先按星级降序，再按攻击+血量降序（原来第二个 OrderByDescending 会完全覆盖第一个，改用 ThenByDescending）
+                    return targets.OrderByDescending(x => x.GetEntity().GetTechLevel()).ThenByDescending(x => x.GetEntity().GetRealTimeAttack() + x.GetEntity().GetHealth()).FirstOrDefault();
                 case "BG20_HERO_201p":// 沃金
                     return targets.OrderByDescending(x => x.GetEntity().GetRealTimeAttack()).FirstOrDefault();
                 case "TB_BaconShop_HP_040":// 疯狂金字塔
@@ -400,7 +401,8 @@ namespace HsBgAI.Tools
                 case "BG26_HERO_102p2":// 因葛，钢铁颂歌
                     return targets.Where(x => x.GetControllerSide() == Player.Side.FRIENDLY).OrderByDescending(x => x.GetEntity().GetRealTimeAttack()).FirstOrDefault();
                 case "TB_BaconShop_HP_084":// 詹迪斯·巴罗夫
-                    return targets.OrderBy(x => x.GetEntity().GetRealTimeAttack() + x.GetEntity().GetHealth()).OrderBy(x => x.GetEntity().GetTechLevel()).FirstOrDefault();
+                    // 先按星级升序，再按攻击+血量升序（原来第二个 OrderBy 会完全覆盖第一个，改用 ThenBy）
+                    return targets.OrderBy(x => x.GetEntity().GetTechLevel()).ThenBy(x => x.GetEntity().GetRealTimeAttack() + x.GetEntity().GetHealth()).FirstOrDefault();
                 default:
                     return targets.FirstOrDefault();
             }

@@ -15,22 +15,13 @@ namespace HsBgAI.Tools
         public static async UniTask<T> WaitForSync<T>(Func<T> action, TimeSpan timeout, TimeSpan? checkInterval = null)
         {
             var interval = checkInterval ?? TimeSpan.FromMilliseconds(500);
-
-            // create a cancellation token for the timeout of the UniTask
-            var timeoutTS = new CancellationTokenSource();
+            using var timeoutTS = new CancellationTokenSource();
             timeoutTS.CancelAfterSlim(timeout);
             while (!timeoutTS.IsCancellationRequested)
             {
-                // run sync action
                 var result = action();
-
-                // check if the result is not the default value of the type, if so, return the result
                 if (!EqualityComparer<T>.Default.Equals(result, default))
-                {
-                    // cancel the timeout task, release resources
-                    timeoutTS.Cancel();
                     return result;
-                }
                 await UniTask.Delay(interval, cancellationToken: timeoutTS.Token);
             }
             return default;
@@ -47,22 +38,13 @@ namespace HsBgAI.Tools
         public static async UniTask<T> WaitForAsync<T>(Func<UniTask<T>> action, TimeSpan timeout, TimeSpan? checkInterval = null)
         {
             var interval = checkInterval ?? TimeSpan.FromMilliseconds(500);
-
-            // create a cancellation token for the timeout of the UniTask
-            var timeoutTS = new CancellationTokenSource();
+            using var timeoutTS = new CancellationTokenSource();
             timeoutTS.CancelAfterSlim(timeout);
             while (!timeoutTS.IsCancellationRequested)
             {
-                // run async action
                 var result = await action();
-
-                // check if the result is not the default value of the type, if so, return the result
                 if (!EqualityComparer<T>.Default.Equals(result, default))
-                {
-                    // cancel the timeout task, release resources
-                    timeoutTS.Cancel();
                     return result;
-                }
                 await UniTask.Delay(interval, cancellationToken: timeoutTS.Token);
             }
             return default;

@@ -23,7 +23,6 @@ namespace HsBgAI.Patchers
                 var sortedXpChanges = xpChanges.OrderBy(x => x.CurrLevel)
                         .ThenBy(x => x.CurrXp)
                         .ToList();
-                int index = 1;
                 foreach (var xpChange in sortedXpChanges)
                 {
                     RewardTrackType rewardTrackType = (RewardTrackType)xpChange.RewardTrackType;
@@ -32,14 +31,13 @@ namespace HsBgAI.Patchers
                     {
                         MainProcess.Instance.gameInfo.AllGetXp += introXpGained;
                         LogPrintUtils.Info(Utils.GetCallingMethod(), "通行证经验 + " + introXpGained + " 过去等级 " + xpChange.PrevLevel + " 过去经验 " + xpChange.PrevXp + " 当前等级 " + xpChange.CurrLevel + " 当前经验 " + xpChange.CurrXp);
-                        string MatchInfo = $"+{introXpGained},{xpChange.PrevLevel},{xpChange.PrevXp},{xpChange.CurrLevel},{xpChange.CurrXp}/{(xpChange.CurrLevel > 130 ? 1500 : GameInfoUtils.LevelExperienceThresholds[xpChange.CurrLevel - 1])}";
-                        if (!HsBgAI.needConcede) LogPrintUtils.WriteMatchLog($"MatchInfo={HsBgAI.GameUid}|{MatchInfo}");
+                        string matchInfo = $"+{introXpGained},{xpChange.PrevLevel},{xpChange.PrevXp},{xpChange.CurrLevel},{xpChange.CurrXp}/{(xpChange.CurrLevel > 130 ? 1500 : GameInfoUtils.LevelExperienceThresholds[xpChange.CurrLevel - 1])}";
+                        if (!HsBgAI.needConcede) LogPrintUtils.WriteMatchLog($"MatchInfo={HsBgAI.GameUid}|{matchInfo}");
                     }
                     else if (rewardTrackType == RewardTrackType.BATTLEGROUNDS)
                     {
                         LogPrintUtils.Info(Utils.GetCallingMethod(), "战棋通行证经验 + " + introXpGained);
                     }
-                    index++;
                 }
             }
         }
@@ -60,19 +58,8 @@ namespace HsBgAI.Patchers
                 {
                     if (GameMgr.Get().GetGameType() == PegasusShared.GameType.GT_BATTLEGROUNDS)
                     {
-                        string gameRank = "未知";
-                        switch (GameState.Get()?.GetFriendlySidePlayer()?.GetHero()?.GetRealTimePlayerLeaderboardPlace())
-                        {
-                            case 1: gameRank = "第一名"; break;
-                            case 2: gameRank = "第二名"; break;
-                            case 3: gameRank = "第三名"; break;
-                            case 4: gameRank = "第四名"; break;
-                            case 5: gameRank = "第五名"; break;
-                            case 6: gameRank = "第六名"; break;
-                            case 7: gameRank = "第七名"; break;
-                            case 8: gameRank = "第八名"; break;
-                            default: break;
-                        }
+                        int place = GameState.Get()?.GetFriendlySidePlayer()?.GetHero()?.GetRealTimePlayerLeaderboardPlace() ?? 0;
+                        string gameRank = place >= 1 && place <= 8 ? $"第{place}名" : "未知";
                         string gameType = GameMgr.Get().GetGameType().ToString();
                         string finalResult = BaconLobbyMgr.Get()?.GetBattlegroundsActiveGameModeRating().ToString();
                         string gameStr = $"EndGameScreen={HsBgAI.GameUid}|{DateTime.Now:yyyy-MM-dd HH:mm:ss},{gameRank},{finalResult},{gameType}";

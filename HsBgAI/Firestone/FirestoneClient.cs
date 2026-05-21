@@ -16,6 +16,10 @@ namespace HsBgAI.Firestone
         private string compsStrategiesPath = Path.Combine(strategyDataPath, "CompsStrategies.json");
         private string cardStatsDataPath = Path.Combine(strategyDataPath, "CardStats.json");
         private static FirestoneClient instance;
+        /// <summary>
+        /// cardId → CardStat 的快速查找缓存，数据加载后一次性构建
+        /// </summary>
+        private Dictionary<string, CardStat> _cardStatDict;
 
         private FirestoneClient()
         {
@@ -27,9 +31,7 @@ namespace HsBgAI.Firestone
                 var json = File.ReadAllText(heroStatsDataPath);
                 var heroStatsObj = JsonConvert.DeserializeObject<HeroStatsData>(json);
                 if (heroStatsObj != null)
-                {
                     heroStatsData = heroStatsObj;
-                }
             }
             // 获取本地的流派策略数据
             if (File.Exists(compsStrategiesPath))
@@ -37,9 +39,7 @@ namespace HsBgAI.Firestone
                 var json = File.ReadAllText(compsStrategiesPath);
                 var compsStrategiesArr = JsonConvert.DeserializeObject<List<CompsStrategy>>(json);
                 if (compsStrategiesArr != null)
-                {
                     compsStrategies = compsStrategiesArr;
-                }
             }
             // 获取本地的英雄策略数据
             if (File.Exists(heroStrategiesPath))
@@ -47,9 +47,7 @@ namespace HsBgAI.Firestone
                 var json = File.ReadAllText(heroStrategiesPath);
                 var heroStrategiesObj = JsonConvert.DeserializeObject<HeroStrategies>(json);
                 if (heroStrategiesObj != null)
-                {
                     heroStrategies = heroStrategiesObj;
-                }
             }
             // 获取本地的卡牌数据
             if (File.Exists(cardStatsDataPath))
@@ -59,6 +57,10 @@ namespace HsBgAI.Firestone
                 if (cardStatsObj != null)
                 {
                     cardStatsData = cardStatsObj;
+                    // 一次性构建查找字典，避免每次 GetBestCard 时重建
+                    _cardStatDict = cardStatsData.cardStats
+                        .Where(c => !string.IsNullOrEmpty(c.cardId))
+                        .ToDictionary(c => c.cardId, c => c);
                 }
             }
         }
@@ -106,11 +108,8 @@ namespace HsBgAI.Firestone
         {
             if (choices == null || choices.Count == 0)
                 return null;
-
-            // 创建cardId到CardStat的快速查找字典
-            var cardStatDict = cardStatsData.cardStats
-                .Where(c => !string.IsNullOrEmpty(c.cardId))
-                .ToDictionary(c => c.cardId, c => c);
+            if (_cardStatDict == null)
+                return choices.FirstOrDefault();
 
             Entity bestEntity = null;
             double? bestPlacement = double.MaxValue;
@@ -120,12 +119,10 @@ namespace HsBgAI.Firestone
                 var cardId = entity.GetCardId();
                 if (string.IsNullOrEmpty(cardId)) continue;
 
-                // 查找对应的统计信息
-                if (cardStatDict.TryGetValue(cardId, out var stat))
+                // 使用预缓存字典查找
+                if (_cardStatDict.TryGetValue(cardId, out var stat))
                 {
                     var placement = stat.averagePlacement;
-
-                    // 比较并更新最佳选择
                     if (placement.HasValue && placement < bestPlacement)
                     {
                         bestPlacement = placement;
@@ -145,31 +142,15 @@ namespace HsBgAI.Firestone
         /// <returns></returns>
         public bool DetermineUpgradeRound(int currTurn, int currLevel)
         {
-            if (heroStrategies != null && currLevel <= 6)
-            {
-                List<HeroCurve> heroCurves = heroStrategies.curves;
-                if (heroCurves != null && heroCurves.Count > 0)
-                {
-                    HeroCurve fastBasic = heroCurves.Find(x => x.id == "basic");
-                    if (fastBasic != null)
-                    {
-                        List<HeroCurveStep> heroCurveSteps = fastBasic.steps;
-                        if (heroCurveSteps != null && heroCurveSteps.Count > 0)
-                        {
-                            HeroCurveStep step = heroCurveSteps.Find(x => x.turn == currTurn);
-                            if (step != null && step.actions != null && step.actions.Count > 0)
-                            {
-                                List<HeroCurveActionExtended> upgradeActions = step.actions;
-                                // 检查是否存在符合条件的升级动作（根据实际字段调整判断逻辑）
-                                bool hasUpgrade = upgradeActions?.Any(a => a.type == "level" && a.param == currLevel + 1) ?? false;
+            if (heroStrategies == null || currLevel > 6) return false;
 
-                                return hasUpgrade;
-                            }
-                        }
-                    }
-                }
-            }
-            return false;
+            var basicCurve = heroStrategies.curves?.Find(x => x.id == "basic");
+            if (basicCurve == null) return false;
+
+            var step = basicCurve.steps?.Find(x => x.turn == currTurn);
+            if (step?.actions == null || step.actions.Count == 0) return false;
+
+            return step.actions.Any(a => a.type == "level" && a.param == currLevel + 1);
         }
     }
 }

@@ -13,15 +13,19 @@ namespace HsBgAI.Tools
     public class Utils
     {
         /// <summary>
+        /// 缓存 LogSource，避免每次日志调用都 Create/Remove（高频调用的性能优化）
+        /// </summary>
+        private static ManualLogSource _logSource;
+
+        /// <summary>
         /// 在主程序日志文件中打印本插件日志
         /// </summary>
         /// <param name="level"></param>
         /// <param name="message"></param>
         public static void MyLogger(LogLevel level, object message)
         {
-            var myLogSource = BepInEx.Logging.Logger.CreateLogSource(PluginInfo.PLUGIN_GUID + ".MyLogger");
-            myLogSource.Log(level, message);
-            BepInEx.Logging.Logger.Sources.Remove(myLogSource);
+            _logSource ??= BepInEx.Logging.Logger.CreateLogSource(PluginInfo.PLUGIN_GUID);
+            _logSource.Log(level, message);
         }
 
         /// <summary>
@@ -119,27 +123,25 @@ namespace HsBgAI.Tools
         public static int CalculateIntroXpGained(int preLevel, int preXp, int curLevel, int curXp, RewardTrackType rewardTrackType)
         {
             RewardTrack rewardTrack = RewardTrackManager.Get().GetRewardTrack(rewardTrackType);
-            bool flag = preLevel < curLevel;
-            int xpNeeded = rewardTrack.GetRewardTrackLevelRecord(preLevel).XpNeeded;
-            int num = (flag ? xpNeeded : curXp) - preXp;
+            bool leveledUp = preLevel < curLevel;
+
+            // 本级已获得的经验：若升级则计入本级剩余经验，否则直接用当前经验差
+            int preLevelXpNeeded = rewardTrack.GetRewardTrackLevelRecord(preLevel).XpNeeded;
+            int totalXpGained = (leveledUp ? preLevelXpNeeded : curXp) - preXp;
+
+            // 跨多级时，累加中间每级的满级经验
             if (curLevel > preLevel + 1)
             {
-                for (int i = preLevel + 1; i < curLevel; i++)
+                for (int level = preLevel + 1; level < curLevel; level++)
                 {
-                    int num2 = num;
-                    int? num3;
-                    if (rewardTrack == null) num3 = null;
-                    else
-                    {
-                        RewardTrackLevelDbfRecord rewardTrackLevelRecord = rewardTrack.GetRewardTrackLevelRecord(i);
-                        num3 = (rewardTrackLevelRecord != null) ? new int?(rewardTrackLevelRecord.XpNeeded) : null;
-                    }
-                    int? num4 = num3;
-                    num = num2 + num4.GetValueOrDefault();
+                    int? midLevelXpNeeded = rewardTrack?.GetRewardTrackLevelRecord(level)?.XpNeeded;
+                    totalXpGained += midLevelXpNeeded.GetValueOrDefault();
                 }
             }
-            if (flag) num += curXp;
-            return num;
+
+            // 最终加上当前等级已经累积的经验
+            if (leveledUp) totalXpGained += curXp;
+            return totalXpGained;
         }
 
         /// <summary>

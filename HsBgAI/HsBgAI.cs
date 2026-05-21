@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Assets;
 using BepInEx;
 using BepInEx.Configuration;
+using Cysharp.Threading.Tasks;
 using HarmonyLib;
 using Hearthstone.DataModels;
 using Hearthstone.Progression;
@@ -43,6 +44,8 @@ namespace HsBgAI
         private static bool showHelpMessage = false;
         private static float helpMessageStartTime = 0f;
         private static string helpMessageText = "";
+        private Texture2D _cachedBgTex;
+        private GUIStyle _cachedHelpStyle;
 
         /// <summary>
         /// 游戏信息
@@ -154,105 +157,13 @@ namespace HsBgAI
             }
             else if (Input.GetKeyUp(KeyCode.F11) && enableClaimReward.Value)
             {
-                string msg = "";
-                LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), "领取成就奖励...");
-                DataModelList<AchievementDataModel> dataModelList = AchievementManager.Get().GetRecentlyCompletedAchievements().GetCurrentSortedAchievements().SortByStatusThenClaimedDate().ToDataModelList<AchievementDataModel>();
-                var completedList = dataModelList.Where(achievement => achievement.Status == AchievementManager.AchievementStatus.COMPLETED).ToList();
-                int achievementRewardCount = 0;
-                foreach (AchievementDataModel achievementDataModel in completedList)
-                {
-                    var chooseOneRewardItemId = 0;
-                    RewardListDataModel rewardListDataModel = achievementDataModel.RewardList;
-                    if (rewardListDataModel != null && rewardListDataModel.ChooseOne)
-                    {
-                        foreach (RewardItemDataModel rewardItemDataModel in rewardListDataModel.Items)
-                        {
-                            RewardItemDbfRecord rewardItemDbfRecord = GameDbf.RewardItem.GetRecord(rewardItemDataModel.AssetId);
-                            var isClaimed = rewardItemDataModel.Card?.Owned ?? false;
-                            LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), $"[领取成就] 多选一 => assetid:{rewardItemDataModel.AssetId} type:{rewardItemDbfRecord.RewardType} name:{rewardItemDbfRecord.CardRecord?.Name.GetString()} {(isClaimed ? "已领取" : "未领取")}");
-                            if (!isClaimed) chooseOneRewardItemId = rewardItemDataModel.AssetId;
-                        }
-                    }
-                    AchievementManager.Get().ClaimAchievementReward(achievementDataModel.ID, chooseOneRewardItemId);
-                    achievementRewardCount++;
-                    LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), $"[领取成就] {achievementDataModel.ID}:{achievementDataModel.Name} 选择:{chooseOneRewardItemId}");
-                }
-                // 打印成就奖励领取数量
-                if (achievementRewardCount > 0)
-                {
-                    msg += $"成功领取了 {achievementRewardCount} 项成就奖励";
-                    LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), $"成功领取了 {achievementRewardCount} 项成就奖励");
-                }
-                else
-                {
-                    msg += "没有可领取的成就奖励";
-                    LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), "没有可领取的成就奖励");
-                }
-                msg += "\n";
-                UIStatus.Get().AddInfo(msg, 5f * Time.timeScale);
-            } else if (Input.GetKeyUp(KeyCode.F12) && enableClaimReward.Value)
+                BotUtils.ClaimAchievementReward().Forget();
+                UIStatus.Get().AddInfo("领取成就奖励...", 5f);
+            } 
+            else if (Input.GetKeyUp(KeyCode.F12) && enableClaimReward.Value)
             {
-                string msg = "";
-                LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), "领取战令奖励...");
-                int battlePassRewardCount = 0;
-                foreach (Global.RewardTrackType rewardTrackType in Enum.GetValues(typeof(Global.RewardTrackType)))
-                {
-                    var reward = RewardTrackManager.Get()?.GetRewardTrack(rewardTrackType);
-                    if (null != reward)
-                    {
-                        // 付费免费
-                        foreach (RewardTrackPaidType paidType in ProgressUtils.AllValidRewardTrackPaidType)
-                        {
-                            // 校验是否有付费免费授权
-                            if (false == reward.HasOwnedRewardTrackPaidType(paidType))
-                                continue;
-                            // 每等级遍历
-                            for (int i = 1; i <= reward.TrackDataModel.Level; ++i)
-                            {
-                                var levelReward = reward.GetRewardTrackLevelRecord(i);
-                                RewardListDbfRecord rewardListRecord = ProgressUtils.GetRewardListRecord(levelReward, paidType);
-                                ProgressUtils.GetRewardListAssetId(levelReward, paidType);
-                                //如果本级没有奖励 过
-                                if (null == rewardListRecord || rewardListRecord.RewardItems.Count <= 0 || rewardListRecord.Locked)
-                                    continue;
-
-                                //如果领取过了 过
-                                var m_rewardTrackLevelState = (PlayerState<PlayerRewardTrackLevelState>)Traverse.Create(reward).Field("m_rewardTrackLevelState").GetValue();
-                                PlayerRewardTrackLevelState state = m_rewardTrackLevelState.GetState(levelReward.Level);
-                                if (ProgressUtils.HasClaimedRewardTrackReward(ProgressUtils.GetRewardStatus(state, paidType)))
-                                {
-                                    continue;
-                                }
-                                int chooseOneRewardItemId = 0;
-                                RewardListDataModel rewardListDataModel = RewardUtils.CreateRewardListDataModelFromRewardListId(rewardListRecord.ID);
-                                if (rewardListDataModel != null && rewardListDataModel.ChooseOne)
-                                {
-                                    foreach (RewardItemDataModel rewardItemDataModel in rewardListDataModel.Items)
-                                    {
-                                        RewardItemDbfRecord rewardItemDbfRecord = GameDbf.RewardItem.GetRecord(rewardItemDataModel.AssetId);
-                                        var isClaimed = rewardItemDataModel.Card?.Owned ?? false;
-                                        LogPrintUtils.Info(Utils.GetCallingMethod(), $"[领取成就] 多选一 => assetid:{rewardItemDataModel.AssetId} type:{rewardItemDbfRecord.RewardType} name:{rewardItemDbfRecord.CardRecord?.Name.GetString()} {(isClaimed ? "已领取" : "未领取")}");
-                                        if (!isClaimed) chooseOneRewardItemId = rewardItemDataModel.AssetId;
-                                    }
-                                }
-                                battlePassRewardCount++;
-                                reward.ClaimReward(reward.RewardTrackId, levelReward.Level, paidType, chooseOneRewardItemId);
-                                LogPrintUtils.Info(Utils.GetCallingMethod(), $"[奖励领取] 领取奖励 通行证[{rewardTrackType}] 付费类型[{paidType}] 等级{i} {rewardListRecord.Description.GetString()} {ProgressUtils.GetRewardStatus(m_rewardTrackLevelState.GetState(levelReward.Level), paidType)} 选择:{chooseOneRewardItemId}");
-                            }
-                        }
-                    }
-                }
-                // 打印战令奖励领取数量
-                if (battlePassRewardCount > 0)
-                {
-                    msg += $"成功领取了 {battlePassRewardCount} 项战令奖励";
-                    LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), $"成功领取了 {battlePassRewardCount} 项战令奖励");
-                }
-                else
-                {
-                    msg += "没有可领取的战令奖励";
-                    LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), "没有可领取的战令奖励");
-                }
+                BotUtils.ClaimBattlePassReward().Forget();
+                UIStatus.Get().AddInfo("领取战令奖励...", 5f);
             }
 
             // 检查是否超时
@@ -296,17 +207,22 @@ namespace HsBgAI
         {
             if (showHelpMessage)
             {
-                // 定义样式 - 使用较小的字体
-                GUIStyle helpStyle = new GUIStyle("box");
-                helpStyle.fontSize = 16;
-                helpStyle.alignment = TextAnchor.UpperLeft;
-                helpStyle.wordWrap = true;
-                helpStyle.padding = new RectOffset(10, 10, 10, 10);
-                helpStyle.normal.textColor = Color.black;
+                // 缓存纹理和样式，避免每帧重建造成内存泄漏
+                if (_cachedBgTex == null)
+                    _cachedBgTex = MakeTex(2, 2, new Color(0.8f, 0.8f, 0.8f, 0.7f));
 
-                // 设置背景颜色
-                Texture2D bgTex = MakeTex(2, 2, new Color(0.8f, 0.8f, 0.8f, 0.7f));
-                helpStyle.normal.background = bgTex;
+                if (_cachedHelpStyle == null)
+                {
+                    _cachedHelpStyle = new GUIStyle("box");
+                    _cachedHelpStyle.fontSize = 16;
+                    _cachedHelpStyle.alignment = TextAnchor.UpperLeft;
+                    _cachedHelpStyle.wordWrap = true;
+                    _cachedHelpStyle.padding = new RectOffset(10, 10, 10, 10);
+                    _cachedHelpStyle.normal.textColor = Color.black;
+                    _cachedHelpStyle.normal.background = _cachedBgTex;
+                }
+
+                GUIStyle helpStyle = _cachedHelpStyle;
 
                 // 计算位置和大小
                 float width = 300f;  // 稍微增加宽度以适应内容

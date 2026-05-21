@@ -110,7 +110,7 @@ namespace HsBgAI.Tools
                     LogPrintUtils.Info(Utils.GetCallingMethod(), $"英雄【{card.GetEntity().GetName()}】 平均排名【{x.averagePosition}】 当前种族平均排名【{x.averagePositionByTribe}】");
                     list.Add((card, x.averagePosition, x.conservativePositionEstimate));
                 }
-                var bestHero = list.OrderByDescending(x => x.AveragePosition).ThenByDescending(x => x.AveragePositionByTribe).FirstOrDefault();
+                var bestHero = list.OrderBy(x => x.AveragePosition).ThenBy(x => x.AveragePositionByTribe).FirstOrDefault();
                 if (!bestHero.Equals(default((Card card, double AveragePosition, double AveragePositionByTribe))))
                 {
                     mulliganManager.ToggleHoldState(bestHero.card);
@@ -162,44 +162,20 @@ namespace HsBgAI.Tools
                 return false;
             }
             List<Card> sellCards = GameInfoUtils.GetBuyOrSellCards(2);
-            if (sellCards.Count == 0)
+            if (sellCards == null || sellCards.Count == 0)
                 return false;
-            List<Card> ownMinions = GameInfoUtils.OwnMinions;
-            if (ownMinions == null)
+            if (GameInfoUtils.OwnMinions == null || GameInfoUtils.OwnHands == null)
                 return false;
-            List<Card> ownHands = GameInfoUtils.OwnHands;
-            if (ownHands == null)
-                return false;
-            var optionsPacket = gameState.GetOptionsPacket();
-            if (optionsPacket == null) return false;
-            var options = optionsPacket.List;
-            if (options == null)
-                return false;
+            var options = gameState.GetOptionsPacket()?.List;
+            if (options == null) return false;
+
+            bool anySold = false;
             foreach (Card card in sellCards)
             {
-                int optionIndex = GameInfoUtils.GetOptionIndexFromCard(options, card);
-                if (optionIndex < 0)
-                    continue;
-                // 卖怪卖身材最小的,必须有目标
-                if (!GameInfoUtils.PlayOption(options[optionIndex], out int targetEntityId, out int subOptionId, cardsList =>
-                {
-                    cardsList = [.. cardsList.OrderBy(iter_card => iter_card.GetEntity().GetCurrentHealth() + iter_card.GetEntity().GetATK())];
-                    var result_card = cardsList.FirstOrDefault();
-                    return (result_card != null, result_card);
-                }))
-                {
-                    continue;
-                }
-                var targetEntity = gameState.GetEntity(targetEntityId);
-                LogPrintUtils.Info(Utils.GetCallingMethod(), $"卖出卡牌【{targetEntity.GetName()}】");
-                LogPrintUtils.Info(Utils.GetCallingMethod(), $"剩余铸币：{GameInfoUtils.OwnMana}");
-                gameState.SetSelectedOption(optionIndex);
-                gameState.SetSelectedSubOption(subOptionId);
-                gameState.SetSelectedOptionTarget(targetEntityId);
-                gameState.SetSelectedOptionPosition(0);
-                gameState.SendOption();
+                if (TrySellCard(gameState, options, card))
+                    anySold = true;
             }
-            return true;
+            return anySold;
         }
 
         /// <summary>
@@ -305,48 +281,56 @@ namespace HsBgAI.Tools
                 return false;
             }
             List<Card> sellCards = GameInfoUtils.GetBuyOrSellCards(2);
-            if (sellCards == null)
-                return false;
+            if (sellCards == null) return false;
             List<Card> ownMinions = GameInfoUtils.OwnMinions;
-            if (ownMinions == null)
-                return false;
             List<Card> ownHands = GameInfoUtils.OwnHands;
-            if (ownHands == null)
-                return false;
+            if (ownMinions == null || ownHands == null) return false;
             // 场上小于7个或者手上没有随从，不用卖随从
             if (ownMinions.Count < 7 || !ownHands.Any(x => x.GetEntity().IsMinion()))
                 return false;
-            var optionsPacket = gameState.GetOptionsPacket();
-            if (optionsPacket == null) return false;
-            var options = optionsPacket.List;
-            if (options == null)
-                return false;
+            var options = gameState.GetOptionsPacket()?.List;
+            if (options == null) return false;
+
             foreach (Card card in sellCards)
             {
-                int optionIndex = GameInfoUtils.GetOptionIndexFromCard(options, card);
-                if (optionIndex < 0)
-                    continue;
-                // 卖怪卖身材最小的,必须有目标
-                if (!GameInfoUtils.PlayOption(options[optionIndex], out int targetEntityId, out int subOptionId, cardsList =>
-                {
-                    cardsList = [.. cardsList.OrderBy(iter_card => iter_card.GetEntity().GetCurrentHealth() + iter_card.GetEntity().GetATK())];
-                    var result_card = cardsList.FirstOrDefault();
-                    return (result_card != null, result_card);
-                }))
-                {
-                    continue;
-                }
-                var targetEntity = gameState.GetEntity(targetEntityId);
-                LogPrintUtils.Info(Utils.GetCallingMethod(), $"卖出卡牌【{targetEntity.GetName()}】");
-                LogPrintUtils.Info(Utils.GetCallingMethod(), $"剩余铸币：{GameInfoUtils.OwnMana}");
-                gameState.SetSelectedOption(optionIndex);
-                gameState.SetSelectedSubOption(subOptionId);
-                gameState.SetSelectedOptionTarget(targetEntityId);
-                gameState.SetSelectedOptionPosition(0);
-                gameState.SendOption();
-                return true;
+                if (TrySellCard(gameState, options, card))
+                    return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// 尝试卖出指定卡牌（卖身材最小的）
+        /// </summary>
+        /// <param name="gameState"></param>
+        /// <param name="options"></param>
+        /// <param name="card"></param>
+        /// <returns></returns>
+        private static bool TrySellCard(GameState gameState, List<Network.Options.Option> options, Card card)
+        {
+            int optionIndex = GameInfoUtils.GetOptionIndexFromCard(options, card);
+            if (optionIndex < 0) return false;
+
+            // 卖怪卖身材最小的，必须有目标
+            if (!GameInfoUtils.PlayOption(options[optionIndex], out int targetEntityId, out int subOptionId, cardsList =>
+            {
+                cardsList = [.. cardsList.OrderBy(c => c.GetEntity().GetCurrentHealth() + c.GetEntity().GetATK())];
+                var result = cardsList.FirstOrDefault();
+                return (result != null, result);
+            }))
+            {
+                return false;
+            }
+
+            var targetEntity = gameState.GetEntity(targetEntityId);
+            LogPrintUtils.Info(Utils.GetCallingMethod(), $"卖出卡牌【{targetEntity.GetName()}】");
+            LogPrintUtils.Info(Utils.GetCallingMethod(), $"剩余铸币：{GameInfoUtils.OwnMana}");
+            gameState.SetSelectedOption(optionIndex);
+            gameState.SetSelectedSubOption(subOptionId);
+            gameState.SetSelectedOptionTarget(targetEntityId);
+            gameState.SetSelectedOptionPosition(0);
+            gameState.SendOption();
+            return true;
         }
 
         /// <summary>
@@ -509,13 +493,13 @@ namespace HsBgAI.Tools
                 return false;
             }
             var hands = GameInfoUtils.OwnHands;
-            foreach (var item in GameInfoUtils.OwnHands)
+            if (hands == null || hands.Count == 0) return false;
+            foreach (var item in hands)
             {
                 var entity = item.GetEntity();
                 if (entity == null) continue;
                 LogPrintUtils.Info(Utils.GetCallingMethod(), $"手牌 {entity.GetCardId()} {entity.GetName()}");
             }
-            if (hands == null || hands.Count == 0) return false;
             var optionsPacket = gameState.GetOptionsPacket();
             if (optionsPacket == null) return false;
             var options = optionsPacket.List;
