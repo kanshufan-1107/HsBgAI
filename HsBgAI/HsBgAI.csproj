@@ -30,6 +30,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Firestone 数据模型共享类库 -->
+    <ProjectReference Include="..\..\HsFirestone.Models\HsFirestone.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="AppsFlyer">
       <HintPath>LibHearthstone\AppsFlyer.dll</HintPath>
       <Private>False</Private>

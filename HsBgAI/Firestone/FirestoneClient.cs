@@ -1,14 +1,15 @@
 using BepInEx;
+using HsFirestone.Models;
 using Newtonsoft.Json;
 
 namespace HsBgAI.Firestone
 {
     public class FirestoneClient
     {
-        public HeroStatsData heroStatsData;
-        public HeroStrategies heroStrategies;
-        public List<CompsStrategy> compsStrategies;
-        public CardStatsData cardStatsData;
+        public HeroStatsData? heroStatsData;
+        public HeroStrategies? heroStrategies;
+        public List<CompsStrategy>? compsStrategies;
+        public CardStatsData? cardStatsData;
 
         private static string strategyDataPath = Path.Combine(Paths.BepInExRootPath, PluginInfo.PARENT_PLUGIN_GUID, "StrategyData");
         private string heroStatsDataPath = Path.Combine(strategyDataPath, "HeroStats.json");
@@ -25,44 +26,29 @@ namespace HsBgAI.Firestone
         {
             // 创建策略文件夹
             if (!Directory.Exists(strategyDataPath)) Directory.CreateDirectory(strategyDataPath);
-            // 获取本地的英雄数据
-            if (File.Exists(heroStatsDataPath))
+
+            // 获取本地缓存数据
+            heroStatsData = LoadLocal<HeroStatsData>(heroStatsDataPath);
+            compsStrategies = LoadLocal<List<CompsStrategy>>(compsStrategiesPath);
+            heroStrategies = LoadLocal<HeroStrategies>(heroStrategiesPath);
+
+            cardStatsData = LoadLocal<CardStatsData>(cardStatsDataPath);
+            if (cardStatsData != null)
             {
-                var json = File.ReadAllText(heroStatsDataPath);
-                var heroStatsObj = JsonConvert.DeserializeObject<HeroStatsData>(json);
-                if (heroStatsObj != null)
-                    heroStatsData = heroStatsObj;
+                // 一次性构建查找字典，避免每次 GetBestCard 时重建
+                _cardStatDict = cardStatsData.cardStats
+                    .Where(c => !string.IsNullOrEmpty(c.cardId))
+                    .ToDictionary(c => c.cardId, c => c);
             }
-            // 获取本地的流派策略数据
-            if (File.Exists(compsStrategiesPath))
-            {
-                var json = File.ReadAllText(compsStrategiesPath);
-                var compsStrategiesArr = JsonConvert.DeserializeObject<List<CompsStrategy>>(json);
-                if (compsStrategiesArr != null)
-                    compsStrategies = compsStrategiesArr;
-            }
-            // 获取本地的英雄策略数据
-            if (File.Exists(heroStrategiesPath))
-            {
-                var json = File.ReadAllText(heroStrategiesPath);
-                var heroStrategiesObj = JsonConvert.DeserializeObject<HeroStrategies>(json);
-                if (heroStrategiesObj != null)
-                    heroStrategies = heroStrategiesObj;
-            }
-            // 获取本地的卡牌数据
-            if (File.Exists(cardStatsDataPath))
-            {
-                var json = File.ReadAllText(cardStatsDataPath);
-                var cardStatsObj = JsonConvert.DeserializeObject<CardStatsData>(json);
-                if (cardStatsObj != null)
-                {
-                    cardStatsData = cardStatsObj;
-                    // 一次性构建查找字典，避免每次 GetBestCard 时重建
-                    _cardStatDict = cardStatsData.cardStats
-                        .Where(c => !string.IsNullOrEmpty(c.cardId))
-                        .ToDictionary(c => c.cardId, c => c);
-                }
-            }
+        }
+
+        /// <summary>
+        /// 读取并反序列化本地 JSON 文件；文件不存在或解析失败时返回 null
+        /// </summary>
+        private static T? LoadLocal<T>(string path) where T : class
+        {
+            if (!File.Exists(path)) return null;
+            return JsonConvert.DeserializeObject<T>(File.ReadAllText(path));
         }
 
         public static FirestoneClient Instance

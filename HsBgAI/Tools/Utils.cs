@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using BepInEx.Logging;
 using Hearthstone.Progression;
 using HsBgAI.Ai;
@@ -29,26 +30,19 @@ namespace HsBgAI.Tools
         }
 
         /// <summary>
-        /// 获取调用方法的名称
+        /// 获取调用方法的名称。
+        /// 由编译期注入的 CallerMemberName/CallerFilePath 直接得到「类名.方法名」，
+        /// 避免原先每次日志都 new StackTrace() 走栈的高昂开销（高频调用的性能优化）。
         /// </summary>
         /// <returns></returns>
-        public static string GetCallingMethod()
+        public static string GetCallingMethod([CallerMemberName] string memberName = "", [CallerFilePath] string filePath = "")
         {
-            var stackTrace = new StackTrace();
-            var frame = stackTrace.GetFrame(2);
-            if (frame == null)
+            var className = string.IsNullOrEmpty(filePath) ? "" : Path.GetFileNameWithoutExtension(filePath);
+            var callingMethod = string.IsNullOrEmpty(className) ? memberName : $"{className}.{memberName}";
+            if (string.IsNullOrEmpty(callingMethod))
             {
                 return "UnknownMethod".PadRight(40);
             }
-
-            var method = frame.GetMethod();
-            if (method == null || method.DeclaringType == null)
-            {
-                return "UnknownMethod".PadRight(40);
-            }
-
-            var str = method.DeclaringType.FullName;
-            var callingMethod = $"{str}.{method.Name}";
             return callingMethod.Length > 40 ? callingMethod.Substring(0, 40) : callingMethod.PadRight(40);
         }
 
