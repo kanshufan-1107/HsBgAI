@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text;
 using Assets;
 using Cysharp.Threading.Tasks;
@@ -95,7 +96,8 @@ namespace HsBgAI.Tools
                 if (cards[1].GetEntity().IsHero())
                 {
                     mulliganManager.ToggleHoldState(cards[1]);
-                    // 仅触发一次确认（原先 MethodInfo.Invoke 与 Traverse 重复调用了两次同一私有方法）
+                    var methodInfo = typeof(MulliganManager).GetMethod("OnMulliganButtonReleased", BindingFlags.NonPublic | BindingFlags.Instance);
+                    methodInfo.Invoke(MulliganManager.Get(), [null]);
                     Traverse.Create(mulliganManager).Method("OnMulliganButtonReleased", new object[] { null }).GetValue();
                     LogPrintUtils.Info(Utils.GetCallingMethod(), $"英雄选择【{cards[1].GetEntity().GetName()}】");
                 }
@@ -114,7 +116,8 @@ namespace HsBgAI.Tools
                 {
                     mulliganManager.ToggleHoldState(bestHero.card);
                     await UniTask.Delay(3000);
-                    // 仅触发一次确认（原先 MethodInfo.Invoke 与 Traverse 重复调用了两次同一私有方法）
+                    var methodInfo = typeof(MulliganManager).GetMethod("OnMulliganButtonReleased", BindingFlags.NonPublic | BindingFlags.Instance);
+                    methodInfo.Invoke(MulliganManager.Get(), [null]);
                     Traverse.Create(mulliganManager).Method("OnMulliganButtonReleased", new object[] { null }).GetValue();
                     LogPrintUtils.Info(Utils.GetCallingMethod(), $"英雄选择【{bestHero.card.GetEntity()?.GetName()}】");
                 }
