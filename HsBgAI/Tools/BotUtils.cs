@@ -185,17 +185,7 @@ namespace HsBgAI.Tools
         /// <returns></returns>
         public static bool Upgrade()
         {
-            GameState gameState = GameState.Get();
-            if (gameState == null)
-            {
-                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
-                return false;
-            }
-            var optionsPacket = gameState.GetOptionsPacket();
-            if (optionsPacket == null) return false;
-            var options = optionsPacket.List;
-            if (options == null || options.Count == 0)
-                return false;
+            if (!TryGetOptions(out var gameState, out var options)) return false;
             if (GameInfoUtils.UpgradeButtonCard == null) return false;
             bool canUpgrade = FirestoneClient.Instance.DetermineUpgradeRound(GameInfoUtils.BattleTurnCounter, GameInfoUtils.OwnTavernTier);
             if (!canUpgrade)
@@ -217,11 +207,7 @@ namespace HsBgAI.Tools
             int optionIndex = GameInfoUtils.GetOptionIndexFromCard(options, GameInfoUtils.UpgradeButtonCard);
             if (optionIndex == -1)
                 return false;
-            gameState.SetSelectedOption(optionIndex);
-            gameState.SetSelectedSubOption(-1);
-            gameState.SetSelectedOptionTarget(0);
-            gameState.SetSelectedOptionPosition(0);
-            gameState.SendOption();
+            SubmitOption(gameState, optionIndex);
             return true;
         }
 
@@ -231,18 +217,10 @@ namespace HsBgAI.Tools
         /// <returns></returns>
         public static bool BuyCard()
         {
-            GameState gameState = GameState.Get();
-            if (gameState == null)
-            {
-                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
-                return false;
-            }
+            if (!TryGetOptions(out var gameState, out var options)) return false;
             List<Card> buyCards = GameInfoUtils.GetBuyOrSellCards(1);
             if (buyCards == null || buyCards.Count == 0)
                 return false;
-            var optionsPacket = gameState.GetOptionsPacket();
-            if (optionsPacket == null) return false;
-            var options = optionsPacket.List;
             foreach (Card card in buyCards)
             {
                 int optionIndex = GameInfoUtils.GetOptionIndexFromCard(options, card);
@@ -259,11 +237,7 @@ namespace HsBgAI.Tools
                 }
                 var targetEntity = gameState.GetEntity(targetEntityId);
                 LogPrintUtils.Info(Utils.GetCallingMethod(), $"购买卡牌【{targetEntity.GetName()}】");
-                gameState.SetSelectedOption(optionIndex);
-                gameState.SetSelectedSubOption(subOptionId);
-                gameState.SetSelectedOptionTarget(targetEntityId);
-                gameState.SetSelectedOptionPosition(0);
-                gameState.SendOption();
+                SubmitOption(gameState, optionIndex, targetEntityId, subOptionId);
                 return true;
             }
             return false;
@@ -275,22 +249,14 @@ namespace HsBgAI.Tools
         /// <returns></returns>
         public static bool SellCardWhenFull()
         {
-            GameState gameState = GameState.Get();
-            if (gameState == null)
-            {
-                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
-                return false;
-            }
+            if (!TryGetOptions(out var gameState, out var options)) return false;
             List<Card> sellCards = GameInfoUtils.GetBuyOrSellCards(2);
             if (sellCards == null) return false;
             List<Card> ownMinions = GameInfoUtils.OwnMinions;
             List<Card> ownHands = GameInfoUtils.OwnHands;
             if (ownMinions == null || ownHands == null) return false;
-            // 场上小于7个或者手上没有随从，不用卖随从
             if (ownMinions.Count < 7 || !ownHands.Any(x => x.GetEntity().IsMinion()))
                 return false;
-            var options = gameState.GetOptionsPacket()?.List;
-            if (options == null) return false;
 
             foreach (Card card in sellCards)
             {
@@ -326,11 +292,7 @@ namespace HsBgAI.Tools
             var targetEntity = gameState.GetEntity(targetEntityId);
             LogPrintUtils.Info(Utils.GetCallingMethod(), $"卖出卡牌【{targetEntity.GetName()}】");
             LogPrintUtils.Info(Utils.GetCallingMethod(), $"剩余铸币：{GameInfoUtils.OwnMana}");
-            gameState.SetSelectedOption(optionIndex);
-            gameState.SetSelectedSubOption(subOptionId);
-            gameState.SetSelectedOptionTarget(targetEntityId);
-            gameState.SetSelectedOptionPosition(0);
-            gameState.SendOption();
+            SubmitOption(gameState, optionIndex, targetEntityId, subOptionId);
             return true;
         }
 
@@ -340,22 +302,11 @@ namespace HsBgAI.Tools
         /// <returns></returns>
         public static bool PlayCard()
         {
-            GameState gameState = GameState.Get();
-            if (gameState == null)
-            {
-                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
-                return false;
-            }
+            if (!TryGetOptions(out var gameState, out var options)) return false;
             List<Card> ownHands = GameInfoUtils.OwnHands;
-            if (ownHands == null)
-                return false;
-            var optionsPacket = gameState.GetOptionsPacket();
-            if (optionsPacket == null) return false;
-            var options = optionsPacket.List;
-            if (options == null || options.Count == 0) return false;
+            if (ownHands == null) return false;
             var ownMinions = GameInfoUtils.OwnMinions;
-            var enemyMinions = GameInfoUtils.EnemyMinions;
-            if (ownMinions == null || enemyMinions == null)
+            if (ownMinions == null || GameInfoUtils.EnemyMinions == null)
                 return false;
             foreach (Card ownHandCard in ownHands.Where(c => c != null))
             {
@@ -365,7 +316,6 @@ namespace HsBgAI.Tools
                     LogPrintUtils.Error(Utils.GetCallingMethod(), $"发现空实体手牌: {ownHandCard}");
                     continue;
                 }
-                // 场面满了后先卖一个随从
                 if (ownMinions.Count >= 7 && entity.IsMinion())
                 {
                     LogPrintUtils.Info(Utils.GetCallingMethod(), "场面满了，先卖一个随从");
@@ -387,11 +337,7 @@ namespace HsBgAI.Tools
                 var targetEntity = gameState.GetEntity(targetEntityId);
                 var targetInfo = targetEntity != null ? $" 目标【{targetEntity.GetName()}】" : "";
                 LogPrintUtils.Info(Utils.GetCallingMethod(), $"使用卡牌【{entity.GetName()}】{targetInfo}");
-                gameState.SetSelectedOption(optionIndex);
-                gameState.SetSelectedSubOption(subOptionId);
-                gameState.SetSelectedOptionTarget(targetEntityId);
-                gameState.SetSelectedOptionPosition(0);
-                gameState.SendOption();
+                SubmitOption(gameState, optionIndex, targetEntityId, subOptionId);
                 return true;
             }
             return false;
@@ -403,33 +349,17 @@ namespace HsBgAI.Tools
         /// <returns></returns>
         public static bool Refresh()
         {
-            GameState gameState = GameState.Get();
-            if (gameState == null)
-            {
-                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
-                return false;
-            }
-            var optionsPacket = gameState.GetOptionsPacket();
-            if (optionsPacket == null) return false;
-            var options = optionsPacket.List;
-            if (options == null)
-                return false;
+            if (!TryGetOptions(out var gameState, out var options)) return false;
             if (GameInfoUtils.RefreshButtonCard == null) return false;
             List<Card> enemyMinions = GameInfoUtils.EnemyMinions;
-            if (enemyMinions == null)
-                return false;
-            // 商店还有怪，或者刷新完没有铸币了，不刷新
+            if (enemyMinions == null) return false;
             if (enemyMinions.Count > 0 || GameInfoUtils.OwnMana - GameInfoUtils.RefreshButtonCard.GetEntity().GetCost() <= 0)
                 return false;
             int optionIndex = GameInfoUtils.GetOptionIndexFromCard(options, GameInfoUtils.RefreshButtonCard);
             if (optionIndex < 0)
                 return false;
             LogPrintUtils.Info(Utils.GetCallingMethod(), $"刷新商店...");
-            gameState.SetSelectedOption(optionIndex);
-            gameState.SetSelectedSubOption(-1);
-            gameState.SetSelectedOptionTarget(0);
-            gameState.SetSelectedOptionPosition(0);
-            gameState.SendOption();
+            SubmitOption(gameState, optionIndex);
             return true;
         }
 
@@ -439,27 +369,13 @@ namespace HsBgAI.Tools
         /// <returns></returns>
         public static bool UseHeroPower()
         {
-            GameState gameState = GameState.Get();
-            if (gameState == null)
-            {
-                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
-                return false;
-            }
-            var optionsPacket = gameState.GetOptionsPacket();
-            if (optionsPacket == null) return false;
-            var options = optionsPacket.List;
-            if (options == null)
-                return false;
+            if (!TryGetOptions(out var gameState, out var options)) return false;
             var ownHeroAbility = GameInfoUtils.OwnHeroAbility;
-            if (ownHeroAbility == null)
-                return false;
+            if (ownHeroAbility == null) return false;
             int optionIndex = GameInfoUtils.GetOptionIndexFromCard(options, ownHeroAbility);
-            if (optionIndex == -1)
-                return false;
+            if (optionIndex == -1) return false;
             if (ownHeroAbility.GetEntity().GetTag(GAME_TAG.EXHAUSTED) != 0 || GameInfoUtils.OwnMana < ownHeroAbility.GetEntity().GetRealTimeCost()) return false;
-            int targetEntityId;
-            int subOptionId;
-            if (!GameInfoUtils.PlayOption(options[optionIndex], out targetEntityId, out subOptionId, cards =>
+            if (!GameInfoUtils.PlayOption(options[optionIndex], out int targetEntityId, out int subOptionId, cards =>
             {
                 var result = GameInfoUtils.GetBestTargetByUseHeroPower(cards);
                 return (true, result);
@@ -468,17 +384,11 @@ namespace HsBgAI.Tools
                 return false;
             }
             if (ownHeroAbility.GetEntity().GetCardId() == "BG20_HERO_301p" && options.Count < 2)
-            {
                 return false;
-            }
             var targetEntity = gameState.GetEntity(targetEntityId);
             LogPrintUtils.Info(Utils.GetCallingMethod(), $"使用英雄技能【{ownHeroAbility.GetEntity().GetName()}】 目标 【{targetEntity?.GetName()}】");
-            gameState.SetSelectedOption(optionIndex);
-            gameState.SetSelectedSubOption(-1);
-            gameState.SetSelectedOptionTarget(targetEntityId);
-            gameState.SetSelectedOptionPosition(0);
-            gameState.SendOption();
-            return false;
+            SubmitOption(gameState, optionIndex, targetEntityId, -1);
+            return true;
         }
 
         /// <summary>
@@ -715,6 +625,40 @@ namespace HsBgAI.Tools
                 result = stringBuilder.ToString();
             }
             return result;
+        }
+
+        /// <summary>
+        /// 获取并验证 GameState 与 OptionsPacket
+        /// </summary>
+        private static bool TryGetOptions(out GameState gameState, out List<Network.Options.Option> options)
+        {
+            gameState = GameState.Get();
+            if (gameState == null)
+            {
+                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
+                options = null;
+                return false;
+            }
+            var packet = gameState.GetOptionsPacket();
+            if (packet == null)
+            {
+                options = null;
+                return false;
+            }
+            options = packet.List;
+            return options != null && options.Count > 0;
+        }
+
+        /// <summary>
+        /// 提交选项并发送
+        /// </summary>
+        private static void SubmitOption(GameState gameState, int optionIndex, int targetEntityId = 0, int subOption = -1, int position = 0)
+        {
+            gameState.SetSelectedOption(optionIndex);
+            gameState.SetSelectedSubOption(subOption);
+            gameState.SetSelectedOptionTarget(targetEntityId);
+            gameState.SetSelectedOptionPosition(position);
+            gameState.SendOption();
         }
     }
 }

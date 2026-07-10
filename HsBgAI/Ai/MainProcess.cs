@@ -36,6 +36,26 @@ namespace HsBgAI.Ai
         private bool _isDirty = false;
         private CancellationTokenSource _delaySaveCts;
 
+        /// <summary>
+        /// 初始化新对局的全局状态标志
+        /// </summary>
+        private static void InitNewGame()
+        {
+            HsBgAI.xpChangedFirstSave = true;
+            HsBgAI.endGameScreenFirstSave = true;
+            HsBgAI.findingGameFirstSave = false;
+            HsBgAI.lazzyGameCount = 0;
+        }
+
+        /// <summary>
+        /// 确保 GameUid 已生成
+        /// </summary>
+        private static void EnsureGameUid()
+        {
+            if (string.IsNullOrEmpty(HsBgAI.GameUid))
+                HsBgAI.GameUid = Utils.GenerateJavaCompatibleUuid();
+        }
+
         private MainProcess()
         {
             _state = GameBattleState.INVALID;
@@ -79,6 +99,23 @@ namespace HsBgAI.Ai
         /// </summary>
         /// <param name="forceSave"></param>
         /// <returns></returns>
+        /// <summary>
+        /// 同步保存游戏信息（用于退出等异步不可用的场景）
+        /// </summary>
+        public void SaveGameInfoSync()
+        {
+            try
+            {
+                var json = JsonConvert.SerializeObject(gameInfo, Formatting.Indented);
+                var tempFilePath = JsonFilePath + ".tmp";
+                File.WriteAllText(tempFilePath, json);
+                if (File.Exists(JsonFilePath))
+                    File.Delete(JsonFilePath);
+                File.Move(tempFilePath, JsonFilePath);
+            }
+            catch { }
+        }
+
         public async UniTask SaveGameInfoAsync(bool forceSave = false)
         {
             if (!forceSave && !_isDirty) return;
@@ -206,33 +243,23 @@ namespace HsBgAI.Ai
                             await FindingBattlegroundsGame();
                             break;
                         case GameBattleState.CHOOSE_HERO:
-                            HsBgAI.xpChangedFirstSave = true;
-                            HsBgAI.endGameScreenFirstSave = true;
-                            HsBgAI.findingGameFirstSave = false;
-                            HsBgAI.lazzyGameCount = 0;
+                            InitNewGame();
                             HsBgAI.GameUid = Utils.GenerateJavaCompatibleUuid();
                             await ChooseHero();
                             break;
                         case GameBattleState.WAITING_FOR_OWN_TURN:
-                            HsBgAI.xpChangedFirstSave = true;
-                            HsBgAI.endGameScreenFirstSave = true;
-                            HsBgAI.findingGameFirstSave = false;
-                            HsBgAI.lazzyGameCount = 0;
-                            if (string.IsNullOrEmpty(HsBgAI.GameUid)) HsBgAI.GameUid = Utils.GenerateJavaCompatibleUuid();
+                            InitNewGame();
+                            EnsureGameUid();
                             await WaittingForOwnTurn();
                             break;
                         case GameBattleState.OWN_TURN:
-                            HsBgAI.xpChangedFirstSave = true;
-                            HsBgAI.endGameScreenFirstSave = true;
-                            HsBgAI.findingGameFirstSave = false;
-                            if (string.IsNullOrEmpty(HsBgAI.GameUid)) HsBgAI.GameUid = Utils.GenerateJavaCompatibleUuid();
+                            InitNewGame();
+                            EnsureGameUid();
                             await OwnTurn();
                             break;
                         case GameBattleState.BATTLE_TURN:
-                            HsBgAI.xpChangedFirstSave = true;
-                            HsBgAI.endGameScreenFirstSave = true;
-                            HsBgAI.findingGameFirstSave = false;
-                            if (string.IsNullOrEmpty(HsBgAI.GameUid)) HsBgAI.GameUid = Utils.GenerateJavaCompatibleUuid();
+                            InitNewGame();
+                            EnsureGameUid();
                             await BattleTurn();
                             break;
                         case GameBattleState.GAME_OVER:

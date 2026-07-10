@@ -146,11 +146,16 @@ namespace HsBgAI.Tools
         {
             try
             {
+                // 尝试保存游戏状态
+                try { Ai.MainProcess.Instance.SaveGameInfoSync(); }
+                catch { }
+                MyLogger(LogLevel.Info, $"HsBgAI 退出中, exitCode={exitCode}");
                 UnityEngine.Application.Quit(exitCode);
             }
             finally
             {
-                Thread.Sleep(11451);
+                // 给 Unity 一些时间优雅关闭，超时后强制终止
+                Thread.Sleep(5000);
                 Process.GetCurrentProcess().Kill();
             }
         }
@@ -306,7 +311,7 @@ namespace HsBgAI.Tools
             Network.CardSaleResult cardSaleResult = Network.Get().GetCardSaleResult();
             if (cardSaleResult.Action == Network.CardSaleResult.SaleResult.CARD_WAS_BOUGHT)
             {
-                ;
+                MyLogger(LogLevel.Info, "正在购买卡牌，跳过分解检查");
             }
             else if (cardSaleResult.Action != Network.CardSaleResult.SaleResult.CARD_WAS_SOLD)
             {

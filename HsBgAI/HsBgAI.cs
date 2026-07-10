@@ -9,6 +9,7 @@ using Hearthstone.Progression;
 using Hearthstone.UI;
 using HsBgAI.Ai;
 using HsBgAI.Mapping;
+using HsBgAI.Helpers;
 using HsBgAI.Patchers;
 using HsBgAI.Tools;
 using PegasusShared;
@@ -41,11 +42,7 @@ namespace HsBgAI
         public static bool endGameScreenFirstSave = false;
         public static bool temporarilyClosed = false;
         private static bool isRunning = true;
-        private static bool showHelpMessage = false;
-        private static float helpMessageStartTime = 0f;
-        private static string helpMessageText = "";
-        private Texture2D _cachedBgTex;
-        private GUIStyle _cachedHelpStyle;
+        private readonly HelpOverlay _helpOverlay = new HelpOverlay();
 
         /// <summary>
         /// 游戏信息
@@ -140,7 +137,7 @@ namespace HsBgAI
                 }
 
                 // 构建简单的帮助信息（去掉富文本标签）
-                helpMessageText = $"{PluginInfo.PLUGIN_NAME} 快捷键帮助\n" +
+                var text = $"{PluginInfo.PLUGIN_NAME} 快捷键帮助\n" +
                                 "───────────────────────\n" +
                                 "F9 : 启动/停止战旗AI\n" +
                                 "F10 : 显示帮助信息\n" +
@@ -151,26 +148,20 @@ namespace HsBgAI
                                 $"当前补丁数: {allPatchNum}\n" +
                                 $"AI状态: {(MainProcess.Instance.Running ? "运行中" : "已停止")}";
 
-                // 设置显示标志和时间
-                showHelpMessage = true;
-                helpMessageStartTime = Time.unscaledTime;
+                _helpOverlay.Show(text);
             }
             else if (Input.GetKeyUp(KeyCode.F11) && enableClaimReward.Value)
             {
                 BotUtils.ClaimAchievementReward().Forget();
                 UIStatus.Get().AddInfo("领取成就奖励...", 5f);
-            } 
+            }
             else if (Input.GetKeyUp(KeyCode.F12) && enableClaimReward.Value)
             {
                 BotUtils.ClaimBattlePassReward().Forget();
                 UIStatus.Get().AddInfo("领取战令奖励...", 5f);
             }
 
-            // 检查是否超时
-            if (showHelpMessage && Time.unscaledTime - helpMessageStartTime > 8f)
-            {
-                showHelpMessage = false;
-            }
+            _helpOverlay.Update();
 
             isRunning = enablePlugin.Value;
             if (!isRunning)
@@ -205,91 +196,7 @@ namespace HsBgAI
 
         private void OnGUI()
         {
-            if (showHelpMessage)
-            {
-                // 缓存纹理和样式，避免每帧重建造成内存泄漏
-                if (_cachedBgTex == null)
-                    _cachedBgTex = MakeTex(2, 2, new Color(0.8f, 0.8f, 0.8f, 0.7f));
-
-                if (_cachedHelpStyle == null)
-                {
-                    _cachedHelpStyle = new GUIStyle("box");
-                    _cachedHelpStyle.fontSize = 16;
-                    _cachedHelpStyle.alignment = TextAnchor.UpperLeft;
-                    _cachedHelpStyle.wordWrap = true;
-                    _cachedHelpStyle.padding = new RectOffset(10, 10, 10, 10);
-                    _cachedHelpStyle.normal.textColor = Color.black;
-                    _cachedHelpStyle.normal.background = _cachedBgTex;
-                }
-
-                GUIStyle helpStyle = _cachedHelpStyle;
-
-                // 计算位置和大小
-                float width = 300f;  // 稍微增加宽度以适应内容
-                float padding = 20f;
-                float x = Screen.width - width - padding;
-                float y = padding;
-
-                // 分割文本行以计算准确高度
-                string[] lines = helpMessageText.Split('\n');
-
-                // 根据行数计算高度
-                float lineHeight = 20f;  // 行高稍微增加
-                float titleHeight = 24f;  // 标题行高
-                float separatorHeight = 16f;  // 分隔线行高
-
-                // 计算总高度
-                float height = 0f;
-                foreach (string line in lines)
-                {
-                    if (line.Contains("快捷键帮助"))
-                        height += titleHeight;
-                    else if (line.Contains("──"))
-                        height += separatorHeight;
-                    else
-                        height += lineHeight;
-                }
-
-                height += 20f;  // 添加一些额外空间
-
-                // 绘制外部背景框
-                GUI.Box(new Rect(x - 5, y - 5, width + 10, height + 10), "");
-
-                // 绘制帮助文本
-                GUI.Label(new Rect(x, y, width, height), helpMessageText, helpStyle);
-
-                // 绘制倒计时
-                float remainingTime = 8f - (Time.unscaledTime - helpMessageStartTime);
-                GUI.Label(new Rect(x, y + height + 5, width, 20),
-                    "自动隐藏: " + remainingTime.ToString("F1") + "秒",
-                    new GUIStyle("label")
-                    {
-                        fontSize = 12,
-                        alignment = TextAnchor.MiddleRight,
-                        normal = { textColor = Color.yellow }  // 改为黄色更显眼
-                    });
-            }
-        }
-
-        /// <summary>
-        /// 创建纹理的工具方法
-        /// </summary>
-        /// <param name="width"></param>
-        /// <param name="height"></param>
-        /// <param name="col"></param>
-        /// <returns></returns>
-        private Texture2D MakeTex(int width, int height, Color col)
-        {
-            Color[] pix = new Color[width * height];
-            for (int i = 0; i < pix.Length; i++)
-            {
-                pix[i] = col;
-            }
-
-            Texture2D result = new Texture2D(width, height);
-            result.SetPixels(pix);
-            result.Apply();
-            return result;
+            _helpOverlay.OnGUI();
         }
     }
 }
