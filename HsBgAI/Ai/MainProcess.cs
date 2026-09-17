@@ -1,4 +1,5 @@
 using System.Threading;
+using Blizzard.T5.Services;
 using Cysharp.Threading.Tasks;
 using Hearthstone.Progression;
 using HsBgAI.Enums;
@@ -715,9 +716,10 @@ namespace HsBgAI.Ai
         {
             GameInfo newObj = new GameInfo();
             NetCache netCacheData = NetCache.Get();
+            var gold = (int)(ServiceManager.Get<CurrencyManager>()?.GetBalance(CurrencyType.GOLD) ?? 0);
             if (netCacheData != null)
             {
-                newObj.Collection = $"金币({netCacheData.GetGoldBalance()}) 粉尘({netCacheData.GetArcaneDustBalance()}) 门票({netCacheData.GetArenaTicketBalance()})";
+                newObj.Collection = $"金币({gold}) 粉尘({netCacheData.GetArcaneDustBalance()}) 门票({netCacheData.GetArenaTicketBalance()})";
             }
             RewardTrackManager rewardTrackManager = RewardTrackManager.Get();
             if (rewardTrackManager != null)
