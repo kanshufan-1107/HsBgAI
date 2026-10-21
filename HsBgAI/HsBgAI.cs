@@ -101,6 +101,8 @@ namespace HsBgAI
                 return;
             }
             LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.Start".PadRight(40), $"插件 {PluginInfo.PLUGIN_NAME} 启动成功......");
+            // 每天 05:00 抓取官网刷新版本起止时间（PluginInfo.GAME_VERSION_*）
+            GameVersionService.Instance.Start();
         }
 
         /// <summary>
@@ -190,6 +192,7 @@ namespace HsBgAI
         private void OnDestroy()
         {
             enableAutoRun.Value = false;
+            GameVersionService.Instance.Stop();
             LogPrintUtils.Info($"{PluginInfo.PLUGIN_GUID}.OnDestroy".PadRight(40), $"插件 {PluginInfo.PLUGIN_NAME} 卸载成功......");
             PatchManager.UnPatchAll();
         }
