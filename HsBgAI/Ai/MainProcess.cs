@@ -669,8 +669,28 @@ namespace HsBgAI.Ai
                     HsBgAI.stopwatch.Restart();
                 }
                 await UniTask.Delay(3000);
-                hitbox.TriggerPress();
-                hitbox.TriggerRelease();
+
+                // 这 3 秒里结算界面可能已经关闭（组件被 Unity 销毁），
+                // 直接点旧的 m_hitbox 会在 PegUIElement.IsScrolling() 里抛
+                // NullReferenceException（Component.get_gameObject）。
+                // 因此延迟后重新取一次，并确认对象仍然有效再点击。
+                try
+                {
+                    var clickTarget = EndGameScreen.Get()?.m_hitbox;
+                    if (clickTarget != null && clickTarget.isActiveAndEnabled)
+                    {
+                        clickTarget.TriggerPress();
+                        clickTarget.TriggerRelease();
+                    }
+                    else
+                    {
+                        LogPrintUtils.Info(Utils.GetCallingMethod(), "结算按钮已失效，跳过点击");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogPrintUtils.Exception(Utils.GetCallingMethod(), ex);
+                }
             }
             if (isCanceled)
             {
