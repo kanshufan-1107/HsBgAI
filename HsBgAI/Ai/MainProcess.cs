@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using Blizzard.T5.Services;
 using Cysharp.Threading.Tasks;
 using Hearthstone.Progression;
@@ -114,7 +114,10 @@ namespace HsBgAI.Ai
                     File.Delete(JsonFilePath);
                 File.Move(tempFilePath, JsonFilePath);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogPrintUtils.Exception(Utils.GetCallingMethod(), ex);
+            }
         }
 
         public async UniTask SaveGameInfoAsync(bool forceSave = false)
@@ -186,10 +189,20 @@ namespace HsBgAI.Ai
         /// <returns></returns>
         public async UniTaskVoid Start()
         {
-            _ = FirestoneClient.Instance;
+            // 4 份策略 JSON 的反序列化放到后台线程，避免点「开始」瞬间主线程掉帧
+            await UniTask.RunOnThreadPool(() => { _ = FirestoneClient.Instance; });
             while (Running)
             {
-                await NextStep();
+                try
+                {
+                    await NextStep();
+                }
+                catch (Exception ex)
+                {
+                    // NextStep 内部的 try 只包住状态 switch，前置判断（GameState/SceneMgr）抛异常时
+                    // 会直接结束本循环，导致 AI 静默停摆（只能手动 F9 重启）。这里兜底并留日志。
+                    LogPrintUtils.Exception(Utils.GetCallingMethod(), ex);
+                }
                 await UniTask.Delay(1000);
             }
             if (!Running)
@@ -202,6 +215,14 @@ namespace HsBgAI.Ai
             }
             return;
         }
+
+        /// <summary>投降次数过多时临时抬高的分段，只影响本次运行，不写回配置文件</summary>
+        private int _levelCapExtra;
+
+        /// <summary>实际生效的维持分段（配置值 + 临时抬高量），&lt; 0 表示不限制</summary>
+        private int EffectiveLevelCap => battlegroundsLevelCap.Value < 0
+            ? battlegroundsLevelCap.Value
+            : battlegroundsLevelCap.Value + _levelCapExtra;
 
         /// <summary>
         /// 下一步执行
@@ -312,9 +333,9 @@ namespace HsBgAI.Ai
                 {
                     int gameRank = baconLobbyMgr.GetBattlegroundsActiveGameModeRating();
                     LogPrintUtils.Info(Utils.GetCallingMethod(), $"战旗当前分数{gameRank}");
-                    if (battlegroundsLevelCap.Value >= 0)
+                    if (EffectiveLevelCap >= 0)
                     {
-                        switch (BotUtils.CheckConcedeState(Math.Max(battlegroundsLevelCap.Value, gameRank), out int base_rank))
+                        switch (BotUtils.CheckConcedeState(Math.Max(EffectiveLevelCap, gameRank), out int base_rank))
                         {
                             case ConcedeState.START:
                                 HsBgAI.needConcede = true;
@@ -351,9 +372,10 @@ namespace HsBgAI.Ai
                 if (HsBgAI.gameStartConcedeTimes > 10)
                 {
                     HsBgAI.gameStartConcedeTimes = 0;
-                    int prevScore = battlegroundsLevelCap.Value;
-                    battlegroundsLevelCap.Value += 500;
-                    LogPrintUtils.Info(Utils.GetCallingMethod(), $"[对局中] 投降次数超过10次，维持分段提升 [ {prevScore} ▲ {battlegroundsLevelCap.Value}]");
+                    int prevCap = EffectiveLevelCap;
+                    // 只抬高运行期使用的值，不写回 HsBgAI.cfg（避免静默改用户配置）
+                    _levelCapExtra += 500;
+                    LogPrintUtils.Info(Utils.GetCallingMethod(), $"[对局中] 投降次数超过10次，维持分段临时提升 [ {prevCap} ▲ {EffectiveLevelCap} ]（仅本次运行生效）");
                 }
                 else if (_preState == GameBattleState.FINDING_GAME)
                 {
@@ -367,15 +389,17 @@ namespace HsBgAI.Ai
             _nextState = GameBattleState.CHOOSE_HERO;
             await AsyncUtil.WaitForAsync(async () =>
             {
-                if (GameState.Get()?.GetOptionsPacket() != null)
+                var gameState = GameState.Get();
+                if (gameState?.GetOptionsPacket() != null)
                 {
                     return true;
                 }
-                if (GameState.Get() != null && GameState.Get().IsInChoiceMode())
+                if (gameState != null && gameState.IsInChoiceMode())
                 {
-                    if (MulliganManager.Get() != null)
+                    var mulliganManager = MulliganManager.Get();
+                    if (mulliganManager != null)
                     {
-                        var cards = MulliganManager.Get().GetStartingCards();
+                        var cards = mulliganManager.GetStartingCards();
                         if (cards != null && cards.Count > 0)
                         {
                             LogPrintUtils.Info("HsBgAI.Ai.ProcessTree.ChooseHero".PadRight(40), "选择英雄");
@@ -724,8 +748,8 @@ namespace HsBgAI.Ai
             HsBgAI.updateRequired = ReconnectMgr.Get().UpdateRequired;
             if (HsBgAI.updateRequired)
                 Utils.SaveErrorJsonData();
-            Thread.Sleep(11451);
-            Utils.Quit(114514);
+            // 延迟退出放到后台线程，避免阻塞主线程（这段时间游戏仍可正常显示提示）
+            Utils.QuitAfter(11451, 114514);
         }
 
         /// <summary>

@@ -13,6 +13,9 @@ namespace HsBgAI.Tools
 {
     public class Utils
     {
+        /// <summary>Application.Quit 之后等待多久再强制结束进程（毫秒）</summary>
+        private const int ForceKillDelayMs = 2500;
+
         /// <summary>
         /// 缓存 LogSource，避免每次日志调用都 Create/Remove（高频调用的性能优化）
         /// </summary>
@@ -148,16 +151,64 @@ namespace HsBgAI.Tools
             {
                 // 尝试保存游戏状态
                 try { Ai.MainProcess.Instance.SaveGameInfoSync(); }
-                catch { }
+                catch (Exception ex) { MyLogger(LogLevel.Error, $"退出前保存游戏信息失败：{ex.Message}"); }
                 MyLogger(LogLevel.Info, $"HsBgAI 退出中, exitCode={exitCode}");
                 UnityEngine.Application.Quit(exitCode);
             }
-            finally
+            catch (Exception ex)
             {
-                // 给 Unity 一些时间优雅关闭，超时后强制终止
-                Thread.Sleep(5000);
-                Process.GetCurrentProcess().Kill();
+                MyLogger(LogLevel.Error, $"调用退出失败：{ex.Message}");
             }
+
+            // 兜底：后台等一小会儿再强制结束，不再在调用线程（通常是主线程）上 Sleep 卡住
+            StartForceKillWatchdog(ForceKillDelayMs);
+        }
+
+        /// <summary>
+        /// 延迟一段时间后在后台退出，不阻塞调用线程（游戏在这段时间内仍可正常显示提示）
+        /// </summary>
+        public static void QuitAfter(int delayMilliseconds, int exitCode = 0)
+        {
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    Thread.Sleep(delayMilliseconds);
+                    Quit(exitCode);
+                }
+                catch
+                {
+                    // 退出流程本身失败时兜底强杀
+                    try { Process.GetCurrentProcess().Kill(); } catch { }
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "HsBgAI.QuitAfter"
+            };
+            thread.Start();
+        }
+
+        /// <summary>强制结束进程的兜底看门狗</summary>
+        private static void StartForceKillWatchdog(int delayMilliseconds)
+        {
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    Thread.Sleep(delayMilliseconds);
+                    Process.GetCurrentProcess().Kill();
+                }
+                catch
+                {
+                    // 忽略：进程可能已经退出
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "HsBgAI.ForceKill"
+            };
+            thread.Start();
         }
 
         /// <summary>

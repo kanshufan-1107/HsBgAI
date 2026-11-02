@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -32,8 +32,8 @@ namespace HsBgAI.Patchers
             {
                 Utils.MyLogger(BepInEx.Logging.LogLevel.Error, $"{loadType.Name} => {ex.Message} \n{ex.InnerException}");
                 Utils.MyLogger(BepInEx.Logging.LogLevel.Error, $"{PluginInfo.PLUGIN_GUID} patch failed!");
-                Thread.Sleep(11451);
-                Utils.Quit(114514);
+                // 延迟退出放到后台线程，避免阻塞主线程（这段时间游戏仍可正常显示提示）
+                Utils.QuitAfter(11451, 114514);
             }
         }
 

@@ -1,4 +1,4 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using HsBgAI.Tools;
 
 namespace HsBgAI.Patchers
@@ -68,8 +68,8 @@ namespace HsBgAI.Patchers
                     LogPrintUtils.Info(Utils.GetCallingMethod(), $"AddFatal ## temporarilyClosed => {HsBgAI.temporarilyClosed}");
 
                     Utils.SaveErrorJsonData();
-                    Thread.Sleep(11451);
-                    Utils.Quit(114514);
+                    // 延迟退出放到后台线程，避免阻塞主线程（这段时间游戏仍可正常显示提示）
+                    Utils.QuitAfter(11451, 114514);
                 }
             }
             catch (Exception ex)

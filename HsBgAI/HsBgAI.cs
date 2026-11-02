@@ -120,6 +120,8 @@ namespace HsBgAI
                     stopwatch.Stop();
                     mainProcess.Running = false;
                     enableAutoRun.Value = false;
+                    // 重置首次启动标记，否则再开启「自动运行」时不会自动开始
+                    hasBegan = false;
                 }
                 else
                 {

@@ -1,4 +1,5 @@
-using BepInEx;
+﻿using BepInEx;
+using HsBgAI.Tools;
 using HsFirestone.Models;
 using Newtonsoft.Json;
 
@@ -16,7 +17,6 @@ namespace HsBgAI.Firestone
         private string heroStrategiesPath = Path.Combine(strategyDataPath, "HeroStrategies.json");
         private string compsStrategiesPath = Path.Combine(strategyDataPath, "CompsStrategies.json");
         private string cardStatsDataPath = Path.Combine(strategyDataPath, "CardStats.json");
-        private static FirestoneClient instance;
         /// <summary>
         /// cardId → CardStat 的快速查找缓存，数据加载后一次性构建
         /// </summary>
@@ -48,17 +48,22 @@ namespace HsBgAI.Firestone
         private static T? LoadLocal<T>(string path) where T : class
         {
             if (!File.Exists(path)) return null;
-            return JsonConvert.DeserializeObject<T>(File.ReadAllText(path));
-        }
-
-        public static FirestoneClient Instance
-        {
-            get
+            try
             {
-                instance ??= new FirestoneClient();
-                return instance;
+                return JsonConvert.DeserializeObject<T>(File.ReadAllText(path));
+            }
+            catch (Exception ex)
+            {
+                // 单个 JSON 损坏时只跳过该份数据，不影响其它数据加载与 AI 启动
+                LogPrintUtils.Exception("FirestoneClient.LoadLocal", ex);
+                return null;
             }
         }
+
+        private static readonly Lazy<FirestoneClient> _lazy =
+            new Lazy<FirestoneClient>(() => new FirestoneClient(), isThreadSafe: true);
+
+        public static FirestoneClient Instance => _lazy.Value;
 
         /// <summary>
         /// 获取英雄选择统计
@@ -76,7 +81,10 @@ namespace HsBgAI.Firestone
                         {
                             HeroStats hs = h.CreateNewHeroStats();
                             hs.tribeStats = [.. hs.tribeStats.Where(t => statsParams.battlegroundsRaces.Contains(t.tribe))];
-                            hs.averagePositionByTribe = hs.tribeStats.Average(t => t.averagePosition);
+                            // 种族过滤后可能为空，Average 对空序列会抛 InvalidOperationException
+                            hs.averagePositionByTribe = hs.tribeStats.Count > 0
+                                ? hs.tribeStats.Average(t => t.averagePosition)
+                                : null;
                             return hs;
                         })
                     .ToList();
