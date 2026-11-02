@@ -189,31 +189,39 @@ namespace HsBgAI.Ai
         /// <returns></returns>
         public async UniTaskVoid Start()
         {
-            // 4 份策略 JSON 的反序列化放到后台线程，避免点「开始」瞬间主线程掉帧
-            await UniTask.RunOnThreadPool(() => { _ = FirestoneClient.Instance; });
-            while (Running)
+            try
             {
-                try
+                // 4 份策略 JSON 的反序列化放到后台线程，避免点「开始」瞬间主线程掉帧
+                await UniTask.RunOnThreadPool(() => { _ = FirestoneClient.Instance; });
+                while (Running)
                 {
-                    await NextStep();
+                    try
+                    {
+                        await NextStep();
+                    }
+                    catch (Exception ex)
+                    {
+                        // NextStep 内部的 try 只包住状态 switch，前置判断（GameState/SceneMgr）抛异常时
+                        // 会直接结束本循环，导致 AI 静默停摆（只能手动 F9 重启）。这里兜底并留日志。
+                        LogPrintUtils.Exception(Utils.GetCallingMethod(), ex);
+                    }
+                    await UniTask.Delay(1000);
                 }
-                catch (Exception ex)
+                if (!Running)
                 {
-                    // NextStep 内部的 try 只包住状态 switch，前置判断（GameState/SceneMgr）抛异常时
-                    // 会直接结束本循环，导致 AI 静默停摆（只能手动 F9 重启）。这里兜底并留日志。
-                    LogPrintUtils.Exception(Utils.GetCallingMethod(), ex);
+                    _state = GameBattleState.INVALID;
+                    _nextState = GameBattleState.INVALID;
+                    _preState = GameBattleState.INVALID;
+                    // 程序停止时强制保存
+                    await SaveGameInfoAsync(true);
                 }
-                await UniTask.Delay(1000);
             }
-            if (!Running)
+            catch (Exception ex)
             {
-                _state = GameBattleState.INVALID;
-                _nextState = GameBattleState.INVALID;
-                _preState = GameBattleState.INVALID;
-                // 程序停止时强制保存
-                await SaveGameInfoAsync(true);
+                // 兜底：UniTaskVoid 的异常无人观察，会以 UnobservedTaskException 抛到客户端日志，
+                // 这里统一处理掉（策略数据加载失败、保存失败等）
+                LogPrintUtils.Exception(Utils.GetCallingMethod(), ex);
             }
-            return;
         }
 
         /// <summary>投降次数过多时临时抬高的分段，只影响本次运行，不写回配置文件</summary>

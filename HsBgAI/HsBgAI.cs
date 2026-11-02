@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Assets;
 using BepInEx;
 using BepInEx.Configuration;
@@ -156,12 +156,12 @@ namespace HsBgAI
             }
             else if (Input.GetKeyUp(KeyCode.F11) && enableClaimReward.Value)
             {
-                BotUtils.ClaimAchievementReward().Forget();
+                BotUtils.ClaimAchievementReward().Forget(LogStartException);
                 UIStatus.Get().AddInfo("领取成就奖励...", 5f);
             }
             else if (Input.GetKeyUp(KeyCode.F12) && enableClaimReward.Value)
             {
-                BotUtils.ClaimBattlePassReward().Forget();
+                BotUtils.ClaimBattlePassReward().Forget(LogStartException);
                 UIStatus.Get().AddInfo("领取战令奖励...", 5f);
             }
 
@@ -188,6 +188,11 @@ namespace HsBgAI
             }
         }
 
+        /// <summary>
+        /// 后台任务的异常兜底：避免 UniTask 未观察异常被 UniTaskScheduler 抛到客户端日志
+        /// </summary>
+        private static void LogStartException(Exception ex)
+            => LogPrintUtils.Exception($"{PluginInfo.PLUGIN_GUID}.Update".PadRight(40), ex);
         /// <summary>
         /// 插件卸载
         /// </summary>

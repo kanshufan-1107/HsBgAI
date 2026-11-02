@@ -11,11 +11,11 @@ namespace HsBgAI.Tools
         /// <summary>
         /// 是否为购物阶段
         /// </summary>
-        public static bool IsBattlegroundShoppingPhase => ZoneMgr.Get().IsBattlegroundShoppingPhase() && FreezeButtonCard != null;
+        public static bool IsBattlegroundShoppingPhase => ZoneMgr.Get()?.IsBattlegroundShoppingPhase() == true && FreezeButtonCard != null;
         /// <summary>
         /// 是否为对战状态
         /// </summary>
-        public static bool IsBattlegroundBattlePhase => ZoneMgr.Get().IsBattlegroundBattlePhase() && FreezeButtonCard == null;
+        public static bool IsBattlegroundBattlePhase => ZoneMgr.Get()?.IsBattlegroundBattlePhase() == true && FreezeButtonCard == null;
         /// <summary>
         /// 冰冻按钮卡牌
         /// </summary>
@@ -230,7 +230,11 @@ namespace HsBgAI.Tools
         /// <returns></returns>
         public static List<Card> GetBuyOrSellCards(int slot)
         {
-            List<ZoneMoveMinionHoverTarget> list = ZoneMgr.Get().FindZonesOfType<ZoneMoveMinionHoverTarget>(Player.Side.FRIENDLY);
+            var zoneMgr = ZoneMgr.Get();
+            if (zoneMgr == null)
+                return null;
+
+            List<ZoneMoveMinionHoverTarget> list = zoneMgr.FindZonesOfType<ZoneMoveMinionHoverTarget>(Player.Side.FRIENDLY);
             if (list == null || list.Count == 0)
                 return null;
             List<ZoneMoveMinionHoverTarget> slotList = [.. list.Where(zone => zone.m_Slot == slot)];
@@ -302,7 +306,7 @@ namespace HsBgAI.Tools
             {
                 if (!option.Main.IsValidTarget(target.ID))
                     continue;
-                Card card = GameState.Get().GetEntity(target.ID).GetCard();
+                Card card = GameState.Get()?.GetEntity(target.ID)?.GetCard();
                 if (card == null)
                     continue;
 
@@ -323,7 +327,7 @@ namespace HsBgAI.Tools
             if (targets == null || targets.Count == 0)
                 return null;
             // 根据对应英雄技能选择对应的目标
-            var heroPower = GameState.Get().GetFriendlySidePlayer()?.GetHeroPowerCard();
+            var heroPower = GameState.Get()?.GetFriendlySidePlayer()?.GetHeroPowerCard();
             if (heroPower == null)
                 return targets.FirstOrDefault();
             switch (heroPower.GetEntity().GetCardId())

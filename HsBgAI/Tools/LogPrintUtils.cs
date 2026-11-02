@@ -5,21 +5,42 @@ namespace HsBgAI.Tools
 {
     public class LogPrintUtils
     {
+        /// <summary>日志写入锁：主线程与后台线程（如 SaveGameInfoAsync）会同时写同一份日志</summary>
+        private static readonly object _writeLock = new object();
+
         /// <summary>
         /// 初始化日志文件路径
         /// </summary>
         public static string GameLogPath = Path.Combine(Paths.BepInExRootPath, PluginInfo.PARENT_PLUGIN_GUID, "GameLog", HsBgAI.hsUnitID);
 
-        /// <summary>
-        /// 写入游戏日志
-        /// </summary>
-        /// <param name="level"></param>
-        /// <param name="formattedMethod"></param>
-        /// <param name="msg"></param>
         private static void EnsureLogDirExists()
         {
             if (!Directory.Exists(GameLogPath))
                 Directory.CreateDirectory(GameLogPath);
+        }
+
+        /// <summary>
+        /// 追加一行日志：加锁 + FileShare.ReadWrite，避免并发写或外部程序读取时抛
+        /// IOException（Sharing violation）
+        /// </summary>
+        private static void AppendLine(string logFile, string line)
+        {
+            lock (_writeLock)
+            {
+                try
+                {
+                    using (var stream = new FileStream(logFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+                    using (var writer = new StreamWriter(stream, Encoding.UTF8))
+                    {
+                        writer.WriteLine(line);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // 写日志失败不能影响主流程，只往 BepInEx 日志里留一条
+                    Utils.MyLogger(BepInEx.Logging.LogLevel.Warning, $"写入 {Path.GetFileName(logFile)} 失败：{ex.Message}");
+                }
+            }
         }
 
         private static void WriteGameLog(string level, string formattedMethod, string msg)
@@ -27,7 +48,7 @@ namespace HsBgAI.Tools
             EnsureLogDirExists();
             string logFile = Path.Combine(GameLogPath, PluginInfo.PLUGIN_GUID + "@" + DateTime.Today.ToString("yyyy-MM-dd") + ".log");
             var levelStr = level.Length < 5 ? level.PadLeft(5) : level.Substring(0, 5);
-            File.AppendAllText(logFile, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {levelStr} --- {formattedMethod} : {msg}{Environment.NewLine}", Encoding.UTF8);
+            AppendLine(logFile, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {levelStr} --- {formattedMethod} : {msg}");
         }
 
         /// <summary>
@@ -38,7 +59,7 @@ namespace HsBgAI.Tools
         {
             EnsureLogDirExists();
             string logFile = Path.Combine(GameLogPath, "MatchInfo.log");
-            File.AppendAllText(logFile, matchInfo + Environment.NewLine, Encoding.UTF8);
+            AppendLine(logFile, matchInfo);
         }
 
         /// <summary>
