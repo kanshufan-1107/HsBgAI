@@ -79,15 +79,21 @@ namespace HsBgAI.Tools
             var cards = mulliganManager.GetStartingCards();
             if (cards == null || cards.Count == 0)
                 return false;
+            var gameState = GameState.Get();
+            if (gameState == null)
+            {
+                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
+                return false;
+            }
             LogPrintUtils.Info(Utils.GetCallingMethod(), $"英雄池【{string.Join(", ", cards.Select(card => card.GetEntity().GetName()))}】");
-            LogPrintUtils.Info(Utils.GetCallingMethod(), $"种族池【{string.Join(", ", GameInfoUtils.ConvertRaceCN(GameState.Get().GetAvailableRacesInBattlegroundsExcludingAmalgam()))}】");
+            LogPrintUtils.Info(Utils.GetCallingMethod(), $"种族池【{string.Join(", ", GameInfoUtils.ConvertRaceCN(gameState.GetAvailableRacesInBattlegroundsExcludingAmalgam()))}】");
             string[] heroCardIdArr = [.. cards
                 .Where(x => !x.GetEntity().HasTag(GAME_TAG.BACON_LOCKED_MULLIGAN_HERO))
                 .Select(x => x.GetEntity().GetCardId())];
             var HeroPickStatsParams = new BattlegroundsHeroPickStatsParams
             {
                 heroCardIds = [.. heroCardIdArr],
-                battlegroundsRaces = [.. GameState.Get().GetAvailableRacesInBattlegroundsExcludingAmalgam().Select(x => (int)x)]
+                battlegroundsRaces = [.. gameState.GetAvailableRacesInBattlegroundsExcludingAmalgam().Select(x => (int)x)]
             };
             // 获取英雄选择数据
             var BattlegroundsHeroPickStats = FirestoneClient.Instance.GetHeroPickStats(HeroPickStatsParams);

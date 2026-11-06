@@ -391,7 +391,7 @@ namespace HsBgAI.Ai
                 }
                 _nextState = GameBattleState.GAME_OVER;
                 LogPrintUtils.Info(Utils.GetCallingMethod(), "[对局中] 触发自动投降");
-                GameState.Get().Concede();
+                GameState.Get()?.Concede();
                 return;
             }
             _nextState = GameBattleState.CHOOSE_HERO;
@@ -661,7 +661,9 @@ namespace HsBgAI.Ai
                     await UniTask.Delay(3000);
                     return true;
                 }
-                if (GameState.Get().IsGameOverNowOrPending())
+                // GameState 在对局结束/断线重连的瞬间可能为 null（日志里表现为
+                // BattleTurn 的 lambda 抛 NullReferenceException），此时继续等待即可
+                if (GameState.Get()?.IsGameOverNowOrPending() == true)
                 {
                     LogPrintUtils.Info("HsBgAI.Ai.ProcessTree.BattleTurn".PadRight(40), "切换到游戏结束状态");
                     _nextState = GameBattleState.GAME_OVER;
