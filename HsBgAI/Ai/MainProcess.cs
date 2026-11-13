@@ -32,7 +32,8 @@ namespace HsBgAI.Ai
         private int _curStateTimes = 0;
         private bool _hasOpitonToDo = true;
         private static readonly string JsonFilePath = Path.Combine(HsBgAI.pluginMainPath, $"Monitor{HsBgAI.monitorSuffix}.json");
-        private readonly object _saveLock = new object();
+        // 与 Utils.SaveErrorJsonData 共用同一把锁，避免后台保存与致命错误保存互相覆盖
+        private static readonly object _saveLock = Utils.MonitorJsonLock;
         private DateTime _lastSaveTime = DateTime.MinValue;
         private bool _isDirty = false;
         private CancellationTokenSource _delaySaveCts;
@@ -79,7 +80,7 @@ namespace HsBgAI.Ai
 
                 if (File.Exists(JsonFilePath))
                 {
-                    var json = File.ReadAllText(JsonFilePath);
+                    var json = Utils.ReadAllTextShared(JsonFilePath);
                     var gameInfoObj = JsonConvert.DeserializeObject<GameInfo>(json);
                     if (gameInfoObj != null)
                     {
@@ -105,18 +106,17 @@ namespace HsBgAI.Ai
         /// </summary>
         public void SaveGameInfoSync()
         {
-            try
+            lock (_saveLock)
             {
-                var json = JsonConvert.SerializeObject(gameInfo, Formatting.Indented);
-                var tempFilePath = JsonFilePath + ".tmp";
-                File.WriteAllText(tempFilePath, json);
-                if (File.Exists(JsonFilePath))
-                    File.Delete(JsonFilePath);
-                File.Move(tempFilePath, JsonFilePath);
-            }
-            catch (Exception ex)
-            {
-                LogPrintUtils.Exception(Utils.GetCallingMethod(), ex);
+                try
+                {
+                    var json = JsonConvert.SerializeObject(gameInfo, Formatting.Indented);
+                    Utils.WriteTextAtomic(JsonFilePath, json);
+                }
+                catch (Exception ex)
+                {
+                    LogPrintUtils.Exception(Utils.GetCallingMethod(), ex);
+                }
             }
         }
 
@@ -133,19 +133,14 @@ namespace HsBgAI.Ai
                 {
                     try
                     {
-                        var tempFilePath = JsonFilePath + ".tmp";
                         string json = JsonConvert.SerializeObject(gameInfo, Formatting.Indented);
-                        File.WriteAllText(tempFilePath, json);
+                        if (Utils.WriteTextAtomic(JsonFilePath, json))
+                        {
+                            _lastSaveTime = now;
+                            _isDirty = false;
 
-                        // 原子性替换文件
-                        if (File.Exists(JsonFilePath))
-                            File.Delete(JsonFilePath);
-                        File.Move(tempFilePath, JsonFilePath);
-
-                        _lastSaveTime = now;
-                        _isDirty = false;
-
-                        LogPrintUtils.Info(Utils.GetCallingMethod(), "游戏信息已保存");
+                            LogPrintUtils.Info(Utils.GetCallingMethod(), "游戏信息已保存");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -653,23 +648,39 @@ namespace HsBgAI.Ai
             HsBgAI.stopwatch.Restart();
             var (isCanceled, _) = await AsyncUtil.WaitForAsync(async UniTask<bool> () =>
             {
-                if (GameInfoUtils.IsBattlegroundShoppingPhase)
+                try
                 {
-                    LogPrintUtils.Info("HsBgAI.Ai.ProcessTree.BattleTurn".PadRight(40), "切换到我方回合状态");
-                    _nextState = GameBattleState.OWN_TURN;
-                    _hasOpitonToDo = true;
-                    await UniTask.Delay(3000);
-                    return true;
+                    if (GameInfoUtils.IsBattlegroundShoppingPhase)
+                    {
+                        LogPrintUtils.Info("HsBgAI.Ai.ProcessTree.BattleTurn".PadRight(40), "切换到我方回合状态");
+                        _nextState = GameBattleState.OWN_TURN;
+                        _hasOpitonToDo = true;
+                        await UniTask.Delay(3000);
+                        return true;
+                    }
+                    // GameState 在对局结束/断线重连的瞬间可能为 null（日志里表现为
+                    // BattleTurn 的 lambda 抛 NullReferenceException），此时继续等待即可
+                    if (GameState.Get()?.IsGameOverNowOrPending() == true)
+                    {
+                        LogPrintUtils.Info("HsBgAI.Ai.ProcessTree.BattleTurn".PadRight(40), "切换到游戏结束状态");
+                        _nextState = GameBattleState.GAME_OVER;
+                        return true;
+                    }
+                    return false;
                 }
-                // GameState 在对局结束/断线重连的瞬间可能为 null（日志里表现为
-                // BattleTurn 的 lambda 抛 NullReferenceException），此时继续等待即可
-                if (GameState.Get()?.IsGameOverNowOrPending() == true)
+                catch (OperationCanceledException)
                 {
-                    LogPrintUtils.Info("HsBgAI.Ai.ProcessTree.BattleTurn".PadRight(40), "切换到游戏结束状态");
-                    _nextState = GameBattleState.GAME_OVER;
-                    return true;
+                    throw;
                 }
-                return false;
+                catch (Exception ex)
+                {
+                    // 对局结束/场景切换的瞬间，Unity 对象可能已被销毁（MissingReferenceException），
+                    // 或 GameState 内部状态不完整；此时继续等待即可，不要让异常穿透 WaitForAsync
+                    // 导致整个轮询提前结束、AI 卡在 BATTLE_TURN。
+                    LogPrintUtils.Warning(Utils.GetCallingMethod(),
+                        $"战斗回合轮询异常，继续等待：{ex.GetType().Name} {ex.Message}");
+                    return false;
+                }
             }, TimeSpan.FromMinutes(2)).SuppressCancellationThrow();
             if (isCanceled)
             {

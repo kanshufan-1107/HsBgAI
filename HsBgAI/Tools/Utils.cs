@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text;
 using BepInEx.Logging;
 using Hearthstone.Progression;
 using HsBgAI.Ai;
@@ -50,32 +51,101 @@ namespace HsBgAI.Tools
         }
 
         /// <summary>
+        /// Monitor JSON 的写锁。SaveGameInfoAsync 在后台线程写、SaveErrorJsonData / FatalError
+        /// 在主线程写，必须共用同一把锁，否则后写入者会覆盖前者的字段。
+        /// </summary>
+        internal static readonly object MonitorJsonLock = new object();
+
+        /// <summary>
+        /// 共享读取文本：允许写方同时打开/替换文件（HsBot 中控会持续读取 Monitor*.json）。
+        /// </summary>
+        internal static string ReadAllTextShared(string path)
+        {
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(stream, Encoding.UTF8))
+                return reader.ReadToEnd();
+        }
+
+        /// <summary>
+        /// 原子写入文本：先写同目录 .tmp，再用 File.Replace/Move 替换目标。
+        /// 目标文件可能正被 HsBot 读取，而 Windows 上读句柄未共享删除时
+        /// File.Delete/Move/Replace 会抛 IOException（日志中的 "being used by another process"），
+        /// 因此失败后短暂重试。重试仍失败只记一条警告，保留 .tmp 供下次覆盖。
+        /// </summary>
+        internal static bool WriteTextAtomic(string path, string content, int retries = 5, int retryDelayMs = 100)
+        {
+            string tmp = path + ".tmp";
+            try
+            {
+                string dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
+                File.WriteAllText(tmp, content, new UTF8Encoding(false));
+
+                for (int attempt = 0; ; attempt++)
+                {
+                    try
+                    {
+                        if (File.Exists(path))
+                            File.Replace(tmp, path, null);   // 原子替换，不再先 Delete
+                        else
+                            File.Move(tmp, path);
+                        return true;
+                    }
+                    catch (IOException) when (attempt < retries)
+                    {
+                        Thread.Sleep(retryDelayMs);
+                    }
+                    catch (UnauthorizedAccessException) when (attempt < retries)
+                    {
+                        Thread.Sleep(retryDelayMs);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MyLogger(LogLevel.Warning, $"写入 {Path.GetFileName(path)} 失败：{ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 保存错误监控信息
         /// </summary>
         public static void SaveErrorJsonData()
         {
-            if (!Directory.Exists(HsBgAI.pluginMainPath)) Directory.CreateDirectory(HsBgAI.pluginMainPath);
             var jsonFile = Path.Combine(HsBgAI.pluginMainPath, $"Monitor{HsBgAI.monitorSuffix}.json");
-            GameInfo gameInfo;
-            if (File.Exists(jsonFile))
+            try
             {
-                string jsonStr = File.ReadAllText(jsonFile);
-                gameInfo = JsonConvert.DeserializeObject<GameInfo>(jsonStr) ?? new GameInfo();
-                gameInfo.UpdateRequired = HsBgAI.updateRequired;
-                gameInfo.TemporarilyClosed = HsBgAI.temporarilyClosed;
-                File.Delete(jsonFile);
-            }
-            else
-            {
-                gameInfo = new GameInfo()
+                if (!Directory.Exists(HsBgAI.pluginMainPath)) Directory.CreateDirectory(HsBgAI.pluginMainPath);
+
+                // 与 MainProcess.SaveGameInfoAsync 共用锁：先读旧统计字段，再合并错误标志，
+                // 避免“读 → 删 → 写”期间被后台保存覆盖（或反过来覆盖后台保存的统计）。
+                lock (MonitorJsonLock)
                 {
-                    UpdateRequired = HsBgAI.updateRequired,
-                    TemporarilyClosed = HsBgAI.temporarilyClosed
-                };
+                    GameInfo gameInfo;
+                    if (File.Exists(jsonFile))
+                    {
+                        string jsonStr = ReadAllTextShared(jsonFile);
+                        gameInfo = JsonConvert.DeserializeObject<GameInfo>(jsonStr) ?? new GameInfo();
+                    }
+                    else
+                    {
+                        gameInfo = new GameInfo();
+                    }
+                    gameInfo.UpdateRequired = HsBgAI.updateRequired;
+                    gameInfo.TemporarilyClosed = HsBgAI.temporarilyClosed;
+
+                    LogPrintUtils.Info(GetCallingMethod(), $"保存异常信息到Monitor{HsBgAI.monitorSuffix}.json");
+                    WriteTextAtomic(jsonFile, JsonConvert.SerializeObject(gameInfo, Formatting.Indented));
+                }
             }
-            LogPrintUtils.Info(GetCallingMethod(), $"保存异常信息到Monitor{HsBgAI.monitorSuffix}.json");
-            string json = JsonConvert.SerializeObject(gameInfo, Formatting.Indented);
-            File.WriteAllText(jsonFile, json);
+            catch (Exception ex)
+            {
+                // 这里位于 FatalError / 更新退出流程，读写失败不能再把异常抛回调用方
+                MyLogger(LogLevel.Warning, $"保存异常信息失败：{ex.Message}");
+            }
         }
 
         /// <summary>

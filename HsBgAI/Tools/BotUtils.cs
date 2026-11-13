@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text;
 using Assets;
 using Cysharp.Threading.Tasks;
@@ -82,7 +82,7 @@ namespace HsBgAI.Tools
             var gameState = GameState.Get();
             if (gameState == null)
             {
-                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
+                LogPrintUtils.Warning(Utils.GetCallingMethod(), "GameState is null（对局尚未开始或已结束）");
                 return false;
             }
             LogPrintUtils.Info(Utils.GetCallingMethod(), $"英雄池【{string.Join(", ", cards.Select(card => card.GetEntity().GetName()))}】");
@@ -165,7 +165,7 @@ namespace HsBgAI.Tools
             GameState gameState = GameState.Get();
             if (gameState == null)
             {
-                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
+                LogPrintUtils.Warning(Utils.GetCallingMethod(), "GameState is null（对局尚未开始或已结束）");
                 return false;
             }
             List<Card> sellCards = GameInfoUtils.GetBuyOrSellCards(2);
@@ -406,7 +406,7 @@ namespace HsBgAI.Tools
             GameState gameState = GameState.Get();
             if (gameState == null)
             {
-                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
+                LogPrintUtils.Warning(Utils.GetCallingMethod(), "GameState is null（对局尚未开始或已结束）");
                 return false;
             }
             var hands = GameInfoUtils.OwnHands;
@@ -641,7 +641,7 @@ namespace HsBgAI.Tools
             gameState = GameState.Get();
             if (gameState == null)
             {
-                LogPrintUtils.Error(Utils.GetCallingMethod(), "GameState is null");
+                LogPrintUtils.Warning(Utils.GetCallingMethod(), "GameState is null（对局尚未开始或已结束）");
                 options = null;
                 return false;
             }

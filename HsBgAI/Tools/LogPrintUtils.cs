@@ -74,6 +74,17 @@ namespace HsBgAI.Tools
         }
 
         /// <summary>
+        /// 打印警告日志（预期内的时序问题，如 GameState 尚未就绪，不应计入错误）
+        /// </summary>
+        /// <param name="formattedMethod"></param>
+        /// <param name="msg"></param>
+        public static void Warning(string formattedMethod, string msg)
+        {
+            Utils.MyLogger(BepInEx.Logging.LogLevel.Warning, msg);
+            WriteGameLog("WARN", formattedMethod, msg);
+        }
+
+        /// <summary>
         /// 打印错误日志
         /// </summary>
         /// <param name="formattedMethod"></param>
