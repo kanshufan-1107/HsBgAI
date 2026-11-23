@@ -34,7 +34,7 @@ HsBgAI is an artificial intelligence system for Hearthstone Battlegrounds, built
 ## Developer Workflows
 
 ### Building the Project
-- Use the `build.bat` script to compile the project.
+- Use `dotnet build HsBgAI.sln` to compile the project.
 - Ensure dependencies are resolved via NuGet.
 
 ### Testing and Debugging

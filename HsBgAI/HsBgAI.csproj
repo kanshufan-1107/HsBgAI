@@ -458,8 +458,4 @@
     </Reference>
   </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="Build">
-    <Exec Command="cmd /c build.bat" />
-  </Target>
-
 </Project>
