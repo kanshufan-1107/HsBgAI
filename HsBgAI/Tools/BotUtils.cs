@@ -548,6 +548,9 @@ namespace HsBgAI.Tools
             LogPrintUtils.Info(Utils.GetCallingMethod(), "领取战令奖励...");
             foreach (Global.RewardTrackType rewardTrackType in Enum.GetValues(typeof(Global.RewardTrackType)))
             {
+                // NONE 不是有效奖励轨道，查询它会触发 RewardTrackManager 的错误日志
+                if (rewardTrackType == Global.RewardTrackType.NONE) continue;
+
                 var reward = RewardTrackManager.Get()?.GetRewardTrack(rewardTrackType);
                 if (null != reward)
                 {
